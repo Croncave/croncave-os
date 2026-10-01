@@ -1,0 +1,8 @@
+{
+  "name": "croncave",
+  "private": true,
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "check": "./scripts/check.sh"
+  }
+}
