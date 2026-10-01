@@ -117,7 +117,7 @@ impl Stack {
     }
 
     pub async fn wait_for<F: Fn(&Value) -> bool>(&self, path: &str, what: &str, f: F) -> Value {
-        for _ in 0..150 {
+        for _ in 0..200 {
             let v = self.get(path).await;
             if f(&v) {
                 return v;

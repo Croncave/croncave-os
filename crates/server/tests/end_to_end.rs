@@ -232,3 +232,15 @@ async fn an_agent_task_asks_before_running_and_its_changes_are_reviewed() {
     );
     tokio::time::sleep(Duration::from_millis(50)).await;
 }
+
+#[tokio::test]
+async fn a_run_started_right_after_waking_is_not_mistaken_for_lost() {
+    let s = common::stack().await;
+    s.sign_up("fay@example.com", "4155550116", "free", None, false).await;
+    let c = computer(&s).await;
+    s.put_bytes(&format!("/computers/{c}/files/write?path=slow.sh"), b"sleep 7\necho done\n".to_vec()).await;
+    let made =
+        s.post(&format!("/computers/{c}/scripts"), json!({ "name": "Slow", "path": "slow.sh", "run_now": true })).await;
+    let run = s.wait_run(made["run_id"].as_str().unwrap()).await;
+    assert_eq!(run["status"], "succeeded", "{run}");
+}

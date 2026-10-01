@@ -38,6 +38,9 @@ pub use stream::{RelayStream, StreamItem};
 pub trait RelayHooks: Send + Sync + 'static {
     /// Trade a one-time bootstrap token for the computer it was issued to.
     async fn redeem_bootstrap(&self, token: &str) -> Option<Uuid>;
+    /// Whether a computer with a genuine credential may still connect (it may have been
+    /// deleted, or belong to another deployment sharing the signing secret).
+    async fn authorize(&self, computer: Uuid) -> bool;
     async fn connected(&self, computer: Uuid, hello: &Hello);
     async fn disconnected(&self, computer: Uuid);
     /// Store events durably. The relay acknowledges them to the agent only on `Ok`.
@@ -197,6 +200,9 @@ async fn connect(State(relay): State<Relay>, headers: HeaderMap, ws: WebSocketUp
     let Some(computer) = relay.inner.credentials.verify(bearer) else {
         return (StatusCode::UNAUTHORIZED, "credential is invalid or expired").into_response();
     };
+    if !relay.inner.hooks.authorize(computer).await {
+        return (StatusCode::UNAUTHORIZED, "this computer is not known here").into_response();
+    }
     ws.max_message_size(16 * 1024 * 1024).on_upgrade(move |socket| async move { relay.serve(computer, socket).await })
 }
 

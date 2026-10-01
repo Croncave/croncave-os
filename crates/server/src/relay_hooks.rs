@@ -40,6 +40,15 @@ impl RelayHooks for Hooks {
         .flatten()
     }
 
+    async fn authorize(&self, computer: Uuid) -> bool {
+        let Some(app) = self.app() else { return false };
+        sqlx::query_scalar::<_, bool>("select exists(select 1 from computers where id = $1 and deleted_at is null)")
+            .bind(computer)
+            .fetch_one(&app.db)
+            .await
+            .unwrap_or(false)
+    }
+
     async fn connected(&self, computer: Uuid, hello: &Hello) {
         let Some(app) = self.app() else { return };
         let r = sqlx::query(
@@ -58,19 +67,29 @@ impl RelayHooks for Hooks {
         if let Err(e) = crate::orchestrator::mark_awake(&app, computer).await {
             tracing::error!(error = %e, "marking computer awake failed");
         }
-        // Runs the agent no longer has were lost (the computer restarted). Give a resent
-        // RunFinished a moment to arrive first.
-        let running = hello.running_runs.clone();
+        // Runs that were running before this connection, and that the agent no longer has,
+        // were lost (the computer restarted). Runs started after it are not suspects. Give a
+        // resent RunFinished a moment to arrive first.
+        let suspects: Vec<Uuid> = sqlx::query_scalar(
+            "select id from runs where computer_id = $1 and status = 'running' and not (id = any($2))",
+        )
+        .bind(computer)
+        .bind(&hello.running_runs)
+        .fetch_all(&app.db)
+        .await
+        .unwrap_or_default();
         app.kick.notify_waiters();
+        if suspects.is_empty() {
+            return;
+        }
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let lost: Vec<(Uuid, Uuid)> = sqlx::query_as(
                 "update runs set status = 'failed', status_note = 'The computer restarted during this run.', error_plain = 'The computer restarted during this run.',
-                        error_fix = 'Retry it.', ended_at = $3
-                 where computer_id = $1 and status = 'running' and not (id = any($2)) returning id, account_id",
+                        error_fix = 'Retry it.', ended_at = $2
+                 where id = any($1) and status = 'running' returning id, account_id",
             )
-            .bind(computer)
-            .bind(&running)
+            .bind(&suspects)
             .bind(app.now())
             .fetch_all(&app.db)
             .await
