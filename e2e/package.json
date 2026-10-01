@@ -1,6 +1,7 @@
 {
   "name": "croncave-e2e",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "type": "module",
   "scripts": {
     "test": "playwright test"

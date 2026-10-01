@@ -1,6 +1,7 @@
 {
   "name": "croncave-web",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -19,7 +20,7 @@
     "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",
     "vite": "^8.3.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.0"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

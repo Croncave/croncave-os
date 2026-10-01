@@ -3,6 +3,24 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: pnpm is pinned per package, and the lockfiles satisfy the release-age policy
+
+**Decision.** `web/package.json` and `e2e/package.json` carry `"packageManager": "pnpm@12.6.0"`, and both
+lockfiles are resolved under pnpm 12's default `minimumReleaseAge` (a package must be a day old). Where a
+dependency's floor demanded a version younger than that — `vitest` was pinned `^5.0.3`, and 5.0.3 was hours old —
+the floor is lowered (`^5.0.0`, which resolves 5.0.2) rather than excluded from the policy.
+
+**Why.** The lockfiles were resolved with pnpm 10.28, which had no release-age policy, so `pnpm install
+--frozen-lockfile` failed outright on a machine with pnpm 12 (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`). The policy
+is worth keeping: a day's delay is what catches a compromised release before it reaches the repo. Pinning the
+version in each manifest means every machine and CI resolve the same way, so a lockfile committed on one machine
+installs on the others.
+
+**Alternatives.** Turn the policy off (`minimumReleaseAge=0`), which gives up the protection that made the install
+fail for a good reason. Let pnpm write `minimumReleaseAgeExclude` for the packages it couldn't satisfy — it offers
+to, and it is the same thing as turning the policy off, one package at a time, with no record of why. Commit the
+lockfile that bypassed the policy locally (the error message names this as the case to distrust).
+
 ## 2026-10-01: Docker computers boot a computer image and reach the relay over the bridge
 
 **Decision.** `COMPUTE_DRIVER=docker` (or `./scripts/dev.sh --docker`) runs each computer as a container from the
