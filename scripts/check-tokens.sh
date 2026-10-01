@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ -d web/src ] || exit 0
-hits=$(grep -rnE '#[0-9a-fA-F]{3,8}\b|rgba?\(\s*[0-9]|hsla?\(\s*[0-9]' web/src \
+hits=$(grep -rnE '#[0-9a-fA-F]{3,8}\b|rgba?\([[:space:]]*[0-9]|hsla?\([[:space:]]*[0-9]' web/src \
   --include='*.svelte' --include='*.ts' --include='*.css' --include='*.html' \
   | grep -vE '\.test\.ts:' \
   | grep -vE '&#[0-9]+;' || true)

@@ -312,7 +312,10 @@ pub async fn kill_leftovers(disk: &crate::disk::Disk) {
 
 /// End every process the run started, not just the first.
 pub async fn kill_group(pid: u32) {
-    let _ = Command::new("kill").args(["-s", "KILL", "--", &format!("-{pid}")]).status().await;
+    // kill(2) directly: the `kill` commands of Linux and macOS disagree about `--`.
+    if let Some(p) = rustix::process::Pid::from_raw(pid as i32) {
+        let _ = rustix::process::kill_process_group(p, rustix::process::Signal::KILL);
+    }
 }
 
 /// CPU percent and memory (MB) of a process group, via `ps` so it works on Linux and macOS.

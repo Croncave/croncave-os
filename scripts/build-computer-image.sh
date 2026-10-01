@@ -16,9 +16,10 @@ if [ "$(uname -s)" = "Linux" ] && [ "${BUILD_AGENT_IN_DOCKER:-0}" != "1" ]; then
   docker build --quiet -f docker/computer.Dockerfile --target prebuilt -t "$IMAGE" "$ctx" >/dev/null
 else
   say "Building $IMAGE (compiles the agent in Docker; the first build takes a few minutes)"
+  # (${secret[@]+...} because bash 3.2, macOS's, calls an empty array unbound.)
   secret=()
   # Behind a TLS-inspecting proxy, the build needs its CA bundle (SSL_CERT_FILE).
   [ -n "${SSL_CERT_FILE:-}" ] && [ -f "$SSL_CERT_FILE" ] && secret=(--secret "id=ca_bundle,src=$SSL_CERT_FILE")
-  docker build --quiet "${secret[@]}" -f docker/computer.Dockerfile --target computer -t "$IMAGE" . >/dev/null
+  docker build --quiet ${secret[@]+"${secret[@]}"} -f docker/computer.Dockerfile --target computer -t "$IMAGE" . >/dev/null
 fi
 say "Built $IMAGE"

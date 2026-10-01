@@ -141,10 +141,10 @@ impl Drop for Stack {
         let dir = self.data.path().join("computers");
         if let Ok(rd) = std::fs::read_dir(dir) {
             for e in rd.flatten() {
-                if let Ok(pid) = std::fs::read_to_string(e.path().join("agent.pid")) {
-                    let _ = std::process::Command::new("kill")
-                        .args(["-s", "KILL", "--", &format!("-{}", pid.trim())])
-                        .status();
+                if let Ok(pid) = std::fs::read_to_string(e.path().join("agent.pid"))
+                    && let Some(pid) = pid.trim().parse().ok().and_then(rustix::process::Pid::from_raw)
+                {
+                    let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
                 }
             }
         }

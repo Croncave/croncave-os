@@ -114,8 +114,9 @@ say "Croncave is running at $WEB"
 say "Sign in with any email; read the link and codes at $WEB/dev (admin: ${ADMIN_EMAILS:-admin@croncave.local})"
 
 if [ "$WATCH" = "0" ]; then
-  wait -n $SERVER $WEBPID
-  exit
+  # (Not `wait -n`: macOS ships bash 3.2.)
+  while kill -0 $SERVER 2>/dev/null && kill -0 $WEBPID 2>/dev/null; do sleep 1; done
+  exit 1
 fi
 
 say "Watching for changes (Ctrl-C to stop)"

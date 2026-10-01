@@ -72,12 +72,20 @@ fn absolute(p: &Path) -> anyhow::Result<PathBuf> {
     Ok(if p.is_absolute() { p.to_path_buf() } else { std::env::current_dir()?.join(p) })
 }
 
-async fn alive(pid: u32) -> bool {
-    Command::new("kill").args(["-0", &pid.to_string()]).status().await.map(|s| s.success()).unwrap_or(false)
+fn pid(pid: u32) -> Option<rustix::process::Pid> {
+    rustix::process::Pid::from_raw(pid as i32)
 }
 
-async fn signal_group(pid: u32, signal: &str) {
-    let _ = Command::new("kill").args(["-s", signal, "--", &format!("-{pid}")]).status().await;
+async fn alive(id: u32) -> bool {
+    pid(id).is_some_and(|p| rustix::process::test_kill_process(p).is_ok())
+}
+
+/// Signal a whole process group. kill(2) directly, since the `kill` commands of Linux
+/// and macOS disagree about negative ids and `--`.
+async fn signal_group(id: u32, signal: rustix::process::Signal) {
+    if let Some(p) = pid(id) {
+        let _ = rustix::process::kill_process_group(p, signal);
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -172,14 +180,14 @@ impl ComputeDriver for LocalDriver {
     async fn stop(&self, compute_ref: &str) -> Result<(), DriverError> {
         let child = self.children.lock().expect("children").remove(compute_ref);
         if let Some(pid) = self.pid(compute_ref) {
-            signal_group(pid, "TERM").await;
+            signal_group(pid, rustix::process::Signal::TERM).await;
             for _ in 0..30 {
                 if !alive(pid).await {
                     break;
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            signal_group(pid, "KILL").await;
+            signal_group(pid, rustix::process::Signal::KILL).await;
         }
         if let Some(mut c) = child {
             let _ = c.wait().await;
