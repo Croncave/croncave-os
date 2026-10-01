@@ -234,6 +234,7 @@ pub fn dollars(m: i64) -> String {
 
 pub async fn run_loop(app: AppState) {
     let mut last_meter = tokio::time::Instant::now();
+    let mut last_retention = tokio::time::Instant::now();
     loop {
         tokio::time::sleep(Duration::from_secs(2)).await;
         if last_meter.elapsed() >= Duration::from_secs(15) {
@@ -248,7 +249,34 @@ pub async fn run_loop(app: AppState) {
         if let Err(e) = trials(&app).await {
             tracing::error!(error = %e, "trial housekeeping failed");
         }
+        if last_retention.elapsed() >= Duration::from_secs(600) {
+            last_retention = tokio::time::Instant::now();
+            if let Err(e) = apply_retention(&app).await {
+                tracing::error!(error = %e, "history retention failed");
+            }
+        }
     }
+}
+
+/// Keep run history only as long as each account's plan says ("History kept").
+pub async fn apply_retention(app: &AppState) -> anyhow::Result<u64> {
+    let accounts: Vec<Account> =
+        sqlx::query_as("select * from accounts where plan is not null").fetch_all(&app.db).await?;
+    let mut removed = 0;
+    for a in accounts {
+        let Ok((_, plan)) = plan_of(app, &a).await else { continue };
+        let cutoff = app.now() - chrono::Duration::days(plan.history_days);
+        let r = sqlx::query(
+            "delete from runs r where r.account_id = $1 and r.ended_at < $2
+             and r.id <> (select id from runs l where l.job_id = r.job_id order by l.queued_at desc limit 1)",
+        )
+        .bind(a.id)
+        .bind(cutoff)
+        .execute(&app.db)
+        .await?;
+        removed += r.rows_affected();
+    }
+    Ok(removed)
 }
 
 /// Turn awake seconds and stored GB-seconds into usage and ledger draws.

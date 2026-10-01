@@ -101,3 +101,28 @@ async fn declined_cards_and_free_overage_are_refused_plainly() {
     assert_eq!(code, 400);
     assert_eq!(err["error"], "Your card was declined.");
 }
+
+#[tokio::test]
+async fn run_history_is_kept_as_long_as_the_plan_says() {
+    let s = common::stack().await;
+    s.sign_up("hal@example.com", "4155550105", "free", None, false).await;
+    let c = s.post("/computers", json!({ "name": "c", "size": "small" })).await;
+    let id = c["id"].as_str().unwrap().to_string();
+    s.wait_for("/me", "the computer to wake", |v| v["computers"][0]["state"] == "awake").await;
+    s.put_bytes(&format!("/computers/{id}/files/write?path=hi.sh"), b"echo hi\n".to_vec()).await;
+    let job =
+        s.post(&format!("/computers/{id}/scripts"), json!({ "name": "Hi", "path": "hi.sh", "run_now": true })).await;
+    let first = job["run_id"].as_str().unwrap().to_string();
+    s.wait_run(&first).await;
+    let job_id = job["job"]["id"].as_str().unwrap().to_string();
+    let second = s.post(&format!("/jobs/{job_id}/run"), json!({})).await;
+    s.wait_run(second["run_id"].as_str().unwrap()).await;
+
+    // Free keeps 7 days. Eight days on, the older run goes; the latest stays.
+    s.post("/dev/clock", json!({ "secs": 8 * 86400 })).await;
+    let removed = croncave_server::billing::apply_retention(&s.app).await.unwrap();
+    assert_eq!(removed, 1);
+    let j = s.get(&format!("/jobs/{job_id}")).await;
+    assert_eq!(j["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(j["runs"][0]["id"], second["run_id"]);
+}
