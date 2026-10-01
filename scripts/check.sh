@@ -20,6 +20,10 @@ cargo clippy --workspace --all-targets --quiet -- -D warnings
 say "Rust: tests (database tests use a real Postgres)"
 DATABASE_URL="" ensure_postgres croncave_test
 export TEST_DATABASE_URL="$DATABASE_URL"
+# Each database test makes its own database; clear out the last run's.
+for db in $(psql "$DATABASE_URL" -tAc "select datname from pg_database where datname like 'cc_test_%'"); do
+  psql "$DATABASE_URL" -qc "drop database if exists $db with (force)" >/dev/null
+done
 cargo build --quiet -p croncave-agent
 cargo test --workspace --quiet
 
