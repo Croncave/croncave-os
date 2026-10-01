@@ -3,8 +3,19 @@
 The designs live on claude.ai design canvases (private to the founder's account):
 
 - Platform screens (Home, notifications, computer switcher, new computer, settings, Files):
-  https://claude.ai/artifact/bec448a6-b6e1-477b-9aea-966e600793a9
-- Plans and Billing (sign-up with phone, plans, trial offer, plan and usage, spending and overage, usage ran out,
+  https://claude.ai/artifact/QZHhozWVvtXLPx8CPYLU9e
+- Watcher (setting up a page watch, the watch page, the assistant on a watch, stock watch setup and page, the type
+  gallery, a setup built from a type's config, a watch set up by the assistant): https://claude.ai/artifact/5TWMR7ksbdKWZydVu2qLHp
+- Scripts (a scheduled script, a run in progress, a finished run and the files it made, adding a script, a failed run):
+  https://claude.ai/artifact/Tb9kNmT6bEEoix7rwYp6XB
+- Code (the editor with the agent working, reviewing the agent's changes, the live preview, agent tasks that run while
+  you're away):
+  https://claude.ai/artifact/N7kp6tVJQutLo5DD2PTFmC
+- Sign in and account (sign in, create an account, check your email; the email link continues to Plans and Billing).
+  The right-hand panel shows the Home "Since you left" card as the example of what Croncave does while you're away:
+  https://claude.ai/artifact/1zngkuwQZW6NP5SRVVTWMw
+- Plans and Billing (sign-up: your details, time zone picker listing all US time zones, and mobile number; confirm the
+  phone code; plans; trial offer, plan and usage, spending and overage, usage ran out,
   trial ending): https://claude.ai/artifact/RubDfGiospYk7fYPEpgoAD
 - Pricing model (interactive): https://claude.ai/artifact/QqDfEEf1QZ8cDMu4nkFiV8
 
