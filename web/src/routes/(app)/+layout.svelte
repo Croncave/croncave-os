@@ -47,8 +47,8 @@
 				{/if}
 				{@render children()}
 			</main>
+			{#if session.activityOpen && !page.url.pathname.startsWith('/activity')}<ActivityPanel />{/if}
 		</div>
-		{#if session.activityOpen}<ActivityPanel />{/if}
 		{#if session.assistantOpen}<AssistantPanel />{/if}
 		<AskButton />
 	</div>

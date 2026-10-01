@@ -17,8 +17,7 @@ test('Home and Activity show what happened, unread notifications, and update wit
 	// A failure needs you: it shows on Home with why, and in Activity as unread.
 	await page.request.put(`/api/computers/${computer}/files/write?path=Scripts/bad.sh`, { data: 'exit 3\n' });
 	await api(page, 'POST', `/computers/${computer}/scripts`, { name: 'Broken job', path: 'Scripts/bad.sh', run_now: true });
-	await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible();
-	await expect(page.getByText('Broken job').first()).toBeVisible();
+	await expect(page.getByTestId('needs-you').filter({ hasText: 'Broken job' })).toContainText('Needs you');
 	await expect(page.getByTestId('unread')).toBeVisible();
 
 	await page.getByTestId('bell').click();

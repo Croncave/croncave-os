@@ -60,8 +60,25 @@ pub async fn home(State(app): State<AppState>, auth: Auth) -> ApiResult<Json<Val
     .bind(account)
     .fetch_all(&app.db)
     .await?;
+    // Work in progress, for "still running" rows with their progress.
+    let running: Vec<(uuid::Uuid, String, String, Option<chrono::DateTime<chrono::Utc>>, Option<Value>, uuid::Uuid)> = sqlx::query_as(
+        "select r.id, j.name, j.app, r.started_at, r.progress, r.computer_id from runs r join jobs j on j.id = r.job_id
+         where r.account_id = $1 and r.status = 'running' and r.trigger <> 'test' and r.kind <> 'dev_server' order by r.started_at",
+    )
+    .bind(account)
+    .fetch_all(&app.db)
+    .await?;
+    // What each computer has switched on, for "1 job running, 4 watches on".
+    let active: Vec<(uuid::Uuid, String, i64)> = sqlx::query_as(
+        "select computer_id, app, count(*) from jobs where account_id = $1 and status = 'active' and kind <> 'dev_server' group by 1, 2",
+    )
+    .bind(account)
+    .fetch_all(&app.db)
+    .await?;
     Ok(Json(json!({
         "name": auth.user.name,
+        "running": running.into_iter().map(|(id, name, a, at, progress, c)| json!({ "run_id": id, "job": name, "app": a, "started_at": at, "progress": progress, "computer_id": c })).collect::<Vec<_>>(),
+        "active": active.into_iter().map(|(c, a, n)| json!({ "computer_id": c, "app": a, "count": n })).collect::<Vec<_>>(),
         "since": since,
         "counts": counts.into_iter().map(|(l, n)| (l, json!(n))).collect::<serde_json::Map<_, _>>(),
         "happened": happened,

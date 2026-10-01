@@ -109,3 +109,16 @@ export function greeting(name: string, d = new Date()): string {
 	const part = h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 	return name ? `${part}, ${name}` : part;
 }
+
+/** "06:12" today, "Sep 29" before that (the designs' time column). */
+export function clock(iso: string | null | undefined, now = new Date()): string {
+	if (!iso) return '';
+	const d = new Date(iso);
+	if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+	return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** The icon each app draws with. */
+export function appIcon(app: string): string {
+	return ({ watcher: 'eye', scripts: 'code', code: 'braces', files: 'folder', billing: 'card', data: 'data', fetcher: 'download', computer: 'server' } as Record<string, string>)[app] ?? 'activity';
+}

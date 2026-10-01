@@ -19,7 +19,7 @@
 </script>
 
 {#if !session.me?.user.prefs.ask_hidden}
-	<div class="ask">
+	<div class="ask" class:beside={session.activityOpen}>
 		<button class="open" onclick={() => (session.assistantOpen = !session.assistantOpen)} aria-label="Ask the assistant" aria-expanded={session.assistantOpen}>
 			<Icon name="sparkle" size={20} />Ask
 		</button>
@@ -33,6 +33,9 @@
 		right: 32px;
 		bottom: 32px;
 		z-index: 25;
+	}
+	.beside {
+		right: 444px;
 	}
 	.open {
 		display: flex;
