@@ -172,6 +172,9 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
         }
     };
     let pid = child.id();
+    if let Some(pid) = pid {
+        remember_group(&ctx.agent.disk, pid, true);
+    }
     let mut stdin = child.stdin.take();
     let (line_tx, mut line_rx) = mpsc::channel::<(OutputStream, String)>(256);
     for (stream, reader) in [
@@ -233,6 +236,9 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
                 }
             },
             status = child.wait(), if !lines_open => {
+                if let Some(pid) = pid {
+                    remember_group(&ctx.agent.disk, pid, false);
+                }
                 let code = status.ok().and_then(|s| s.code());
                 let outcome = if code == Some(0) { RunOutcome::Succeeded } else { RunOutcome::Failed };
                 return ProcessEnd { outcome, exit_code: code, tail: tail.into_iter().collect::<Vec<_>>().join("\n") };
@@ -252,6 +258,7 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
     let outcome = ended_by.unwrap_or(RunOutcome::Failed);
     if let Some(pid) = pid {
         kill_group(pid).await;
+        remember_group(&ctx.agent.disk, pid, false);
     }
     let _ = child.kill().await;
     let code = child.wait().await.ok().and_then(|s| s.code());
@@ -264,6 +271,43 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
     ctx.system(&why);
     tail.push_back(why);
     ProcessEnd { outcome, exit_code: code, tail: tail.into_iter().collect::<Vec<_>>().join("\n") }
+}
+
+/// When a process started, as `ps` reports it (works on Linux and macOS). Used to tell a
+/// remembered process group from an unrelated one that reused its id.
+fn started(pid: u32) -> Option<String> {
+    let out = std::process::Command::new("ps").args(["-o", "lstart=", "-p", &pid.to_string()]).output().ok()?;
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+
+/// Keep the process groups of running work on disk, so a restarted agent can end them.
+fn remember_group(disk: &crate::disk::Disk, pgid: u32, running: bool) {
+    let path = disk.system("agent").join("run-groups");
+    let mut groups: Vec<String> = std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| l.split('\t').next() != Some(&pgid.to_string()))
+        .map(String::from)
+        .collect();
+    if running && let Some(at) = started(pgid) {
+        groups.push(format!("{pgid}\t{at}"));
+    }
+    let body: String = groups.iter().map(|g| format!("{g}\n")).collect();
+    let _ = std::fs::write(path, body);
+}
+
+/// End the process groups a previous boot left running (only if they are still ours).
+pub async fn kill_leftovers(disk: &crate::disk::Disk) {
+    let path = disk.system("agent").join("run-groups");
+    for line in std::fs::read_to_string(&path).unwrap_or_default().lines() {
+        let Some((pgid, at)) = line.split_once('\t') else { continue };
+        let Ok(pgid) = pgid.parse::<u32>() else { continue };
+        if started(pgid).as_deref() == Some(at) {
+            kill_group(pgid).await;
+        }
+    }
+    let _ = std::fs::remove_file(path);
 }
 
 /// End every process the run started, not just the first.

@@ -140,9 +140,18 @@ impl Agent {
 /// Run the agent until it is told to sleep.
 pub async fn run(config: AgentConfig) -> anyhow::Result<()> {
     let agent = Agent::new(config).await?;
+    // Anything still running from a previous boot ends now, as it would when a machine restarts.
+    runs::kill_leftovers(&agent.disk).await;
     files::clean_trash(&agent.disk, agent.config.trash_days);
     let health = tokio::spawn(runs::report_health(agent.clone()));
-    let result = connection::run(agent.clone()).await;
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let result = tokio::select! {
+        r = connection::run(agent.clone()) => r,
+        _ = terminate.recv() => {
+            tracing::info!("asked to stop; ending runs");
+            Ok(())
+        }
+    };
     health.abort();
     agent.runs.stop_all().await;
     agent.outbox.flush_to_disk();

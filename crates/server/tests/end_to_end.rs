@@ -244,3 +244,28 @@ async fn a_run_started_right_after_waking_is_not_mistaken_for_lost() {
     let run = s.wait_run(made["run_id"].as_str().unwrap()).await;
     assert_eq!(run["status"], "succeeded", "{run}");
 }
+
+#[tokio::test]
+async fn stopping_a_computer_ends_everything_it_was_running() {
+    let s = common::stack().await;
+    s.sign_up("gus@example.com", "4155550117", "free", None, false).await;
+    let c = computer(&s).await;
+    s.post(&format!("/computers/{c}/code/projects"), json!({ "name": "site" })).await;
+    // A port nobody else uses in this test run.
+    let port = 40000 + (std::process::id() % 20000) as u16;
+    s.post(&format!("/computers/{c}/code/devserver"), json!({ "project": "Projects/site", "port": port })).await;
+    s.wait_for(&format!("/computers/{c}/code/devserver?project=Projects/site"), "the dev server to listen", |v| {
+        v["server"]["listening"] == true
+    })
+    .await;
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_ok());
+    // Stop it the hard way (no goodbye from the control plane), like a machine shutting down.
+    let (compute_ref,): (String,) = sqlx::query_as("select compute_ref from computers where id = $1::uuid")
+        .bind(&c)
+        .fetch_one(&s.app.db)
+        .await
+        .unwrap();
+    s.app.providers.compute.stop(&compute_ref).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "the dev server stopped with its computer");
+}
