@@ -46,12 +46,16 @@ pub fn min_interval_secs(schedule: &cron::Schedule, from: DateTime<Utc>) -> i64 
     times.windows(2).map(|w| (w[1] - w[0]).num_seconds()).min().unwrap_or(i64::MAX)
 }
 
-pub fn next_after(schedule: &str, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    parse_schedule(schedule).ok()?.1.after(&after).next()
+/// The next run after `after`, reading the schedule's hours in the job's time zone.
+pub fn next_after(schedule: &str, zone: &str, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let tz = crate::zones::tz(zone);
+    parse_schedule(schedule).ok()?.1.after(&after.with_timezone(&tz)).next().map(|t| t.with_timezone(&Utc))
 }
 
-/// A schedule in plain words.
-pub fn describe_schedule(six: &str) -> String {
+/// A schedule in plain words; clock times are in `zone` ("Every day at 9:00 am ET").
+pub fn describe_schedule(six: &str, zone: &str) -> String {
+    let zone = crate::zones::short(zone);
+    let clock_words = |h: u32, m: u32| format!("{} {zone}", clock_words(h, m));
     let f: Vec<&str> = six.split_whitespace().collect();
     if f.len() != 6 || f[0] != "0" {
         return format!("On a custom schedule ({six})");
@@ -99,7 +103,7 @@ fn clock_words(h: u32, m: u32) -> String {
         12 => (12, "pm"),
         _ => (h - 12, "pm"),
     };
-    format!("{h12}:{m:02} {ampm} UTC")
+    format!("{h12}:{m:02} {ampm}")
 }
 
 pub fn human_duration(secs: i64) -> String {
@@ -221,13 +225,17 @@ pub async fn create_job(
     if name.is_empty() || name.len() > 80 {
         return Err(ApiError::bad("Give it a name (up to 80 characters)."));
     }
-    let next_due = if status == "active" { v.schedule.as_deref().and_then(|s| next_after(s, app.now())) } else { None };
+    let next_due = if status == "active" {
+        v.schedule.as_deref().and_then(|s| next_after(s, &computer.time_zone, app.now()))
+    } else {
+        None
+    };
     let id = Uuid::new_v4();
     let mut tx = app.db.begin().await?;
     sqlx::query(
         "insert into jobs (id, account_id, computer_id, app, kind, name, setup, trigger, schedule, watch_path, overlap,
-                           max_runtime_secs, retries, max_spend_micros, notify, status, next_due_at, created_by_kind, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
+                           max_runtime_secs, retries, max_spend_micros, notify, status, next_due_at, created_by_kind, created_by, time_zone)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)",
     )
     .bind(id)
     .bind(auth.account.id)
@@ -248,6 +256,7 @@ pub async fn create_job(
     .bind(next_due)
     .bind(auth.actor_kind)
     .bind(auth.user.id)
+    .bind(&computer.time_zone)
     .execute(&mut *tx)
     .await?;
     crate::measure::audit(
@@ -366,7 +375,7 @@ pub async fn schedule_due(app: &AppState) -> anyhow::Result<usize> {
         {
             queued += 1;
         }
-        let next = job.schedule.as_deref().and_then(|s| next_after(s, now));
+        let next = job.schedule.as_deref().and_then(|s| next_after(s, &job.time_zone, now));
         sqlx::query("update jobs set next_due_at = $2 where id = $1").bind(job.id).bind(next).execute(&mut *tx).await?;
     }
     tx.commit().await?;
@@ -524,7 +533,7 @@ pub async fn job_view(app: &AppState, job: &Job) -> ApiResult<Value> {
             .fetch_optional(&app.db)
             .await?;
     let mut v = serde_json::to_value(job).unwrap_or_default();
-    v["schedule_words"] = json!(job.schedule.as_deref().map(describe_schedule));
+    v["schedule_words"] = json!(job.schedule.as_deref().map(|s| describe_schedule(s, &job.time_zone)));
     v["last_run"] = json!(last.map(|r| run_brief(&r)));
     let secrets: Vec<(String,)> = sqlx::query_as("select name from secrets where job_id = $1 order by name")
         .bind(job.id)
@@ -606,7 +615,11 @@ pub async fn update(
         None => job.setup.clone(),
     };
     let name = b.opts.name.clone().unwrap_or(job.name.clone());
-    let next_due = if status == "active" { v.schedule.as_deref().and_then(|s| next_after(s, app.now())) } else { None };
+    let next_due = if status == "active" {
+        v.schedule.as_deref().and_then(|s| next_after(s, &job.time_zone, app.now()))
+    } else {
+        None
+    };
     let mut tx = app.db.begin().await?;
     sqlx::query(
         "update jobs set name = $2, setup = $3, trigger = $4, schedule = $5, watch_path = $6, overlap = $7, max_runtime_secs = $8,
@@ -956,10 +969,33 @@ mod tests {
     fn schedules_parse_and_read_plainly() {
         let (six, _) = parse_schedule("*/15 * * * *").unwrap();
         assert_eq!(six, "0 */15 * * * *");
-        assert_eq!(describe_schedule(&six), "Every 15 minutes");
-        assert_eq!(describe_schedule("0 0 * * * *"), "Every hour");
-        assert_eq!(describe_schedule("0 30 9 * * *"), "Every day at 9:30 am UTC");
-        assert_eq!(describe_schedule("0 0 18 * * 1-5"), "Weekdays at 6:00 pm UTC");
+        assert_eq!(describe_schedule(&six, "America/New_York"), "Every 15 minutes");
+        assert_eq!(describe_schedule("0 0 * * * *", "America/New_York"), "Every hour");
+        assert_eq!(describe_schedule("0 30 9 * * *", "America/New_York"), "Every day at 9:30 am ET");
+        assert_eq!(describe_schedule("0 0 18 * * 1-5", "America/Los_Angeles"), "Weekdays at 6:00 pm PT");
+    }
+
+    #[test]
+    fn schedules_run_at_the_hour_in_the_jobs_time_zone() {
+        use chrono::TimeZone;
+        // 9 AM every day, asked at noon UTC on a summer day.
+        let at = Utc.with_ymd_and_hms(2026, 7, 1, 12, 0, 0).unwrap();
+        // 9 AM in New York (UTC-4) is 13:00 UTC, still to come today.
+        assert_eq!(
+            next_after("0 9 * * *", "America/New_York", at),
+            Some(Utc.with_ymd_and_hms(2026, 7, 1, 13, 0, 0).unwrap())
+        );
+        // 9 AM in Los Angeles (UTC-7) is 16:00 UTC.
+        assert_eq!(
+            next_after("0 9 * * *", "America/Los_Angeles", at),
+            Some(Utc.with_ymd_and_hms(2026, 7, 1, 16, 0, 0).unwrap())
+        );
+        // In winter New York is UTC-5, so 9 AM is 14:00 UTC.
+        let winter = Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, 0).unwrap();
+        assert_eq!(
+            next_after("0 9 * * *", "America/New_York", winter),
+            Some(Utc.with_ymd_and_hms(2026, 1, 15, 14, 0, 0).unwrap())
+        );
         assert!(parse_schedule("every day").is_err());
     }
 

@@ -38,6 +38,7 @@ pub mod scripts;
 pub mod seed;
 pub mod state;
 pub mod watcher;
+pub mod zones;
 
 use sqlx::postgres::PgPoolOptions;
 

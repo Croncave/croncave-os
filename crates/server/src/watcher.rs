@@ -57,12 +57,20 @@ pub async fn build_setup(app: &AppState, auth: &Auth, type_id: &str, inputs: &Ma
     Ok(json!({ "watch_type": t, "inputs": resolved }))
 }
 
+/// "Every day at 9:00 am ET" → "every day at 9:00 am ET" (only the first letter).
+fn lower_first(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_lowercase().chain(c).collect()).unwrap_or_default()
+}
+
 pub fn plain_rule(job: &Job) -> String {
     let t: Option<WatcherType> = job.setup.get("watch_type").and_then(|t| serde_json::from_value(t.clone()).ok());
     let inputs = job.setup.get("inputs").and_then(Value::as_object).cloned().unwrap_or_default();
     let rule = t.map(|t| t.plain_rule(&inputs)).unwrap_or_else(|| job.name.clone());
     match (&job.trigger[..], job.schedule.as_deref()) {
-        ("schedule", Some(s)) => format!("{}, {}.", rule, crate::jobs::describe_schedule(s).to_lowercase()),
+        ("schedule", Some(s)) => {
+            format!("{}, {}.", rule, lower_first(&crate::jobs::describe_schedule(s, &job.time_zone)))
+        }
         _ => format!("{rule}, when I press Check now."),
     }
 }
@@ -206,7 +214,7 @@ pub async fn describe(State(app): State<AppState>, auth: Auth, Json(b): Json<Pre
     let rule = t.plain_rule(&b.inputs);
     let when = match (b.opts.trigger.as_deref(), b.opts.schedule.as_deref()) {
         (Some("schedule"), Some(s)) => crate::jobs::parse_schedule(s)
-            .map(|(six, _)| crate::jobs::describe_schedule(&six).to_lowercase())
+            .map(|(six, _)| lower_first(&crate::jobs::describe_schedule(&six, &auth.user.time_zone)))
             .unwrap_or_else(|e| e),
         _ => "when I press Check now".into(),
     };

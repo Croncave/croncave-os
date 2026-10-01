@@ -13,8 +13,8 @@
 		{ cron: '*/15 * * * *', label: 'Every 15 minutes', secs: 900 },
 		{ cron: '0 * * * *', label: 'Every hour', secs: 3600 },
 		{ cron: '0 */6 * * *', label: 'Every 6 hours', secs: 21600 },
-		{ cron: '0 9 * * *', label: 'Every day at 9:00 am UTC', secs: 86400 },
-		{ cron: '0 9 * * 1-5', label: 'Weekdays at 9:00 am UTC', secs: 86400 }
+		{ cron: '0 9 * * *', label: 'Every day at 9:00 am', secs: 86400 },
+		{ cron: '0 9 * * 1-5', label: 'Weekdays at 9:00 am', secs: 86400 }
 	];
 	let custom = $state(false);
 	$effect(() => {
@@ -32,7 +32,7 @@
 	{#if trigger === 'schedule'}
 		{#if custom || (!known && schedule)}
 			<input class="mono" bind:value={schedule} placeholder="*/15 * * * *" aria-label="Cron schedule" />
-			<span class="low">Minute, hour, day of month, month, day of week (UTC).</span>
+			<span class="low">Minute, hour, day of month, month, day of week, in the computer's time zone.</span>
 		{:else}
 			<select bind:value={schedule} aria-label="Schedule">
 				{#each choices as c (c.cron)}

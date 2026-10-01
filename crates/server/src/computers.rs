@@ -130,8 +130,8 @@ pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewCo
         .map_err(|e| ApiError::unavailable(format!("Couldn't create the computer: {e}")))?;
     let mut tx = app.db.begin().await?;
     sqlx::query(
-        "insert into computers (id, account_id, name, size, cpu, memory_gb, disk_gb, state, compute_ref, wake_requested_at, wake_cause)
-         values ($1, $2, $3, $4, $5, $6, $7, 'asleep', $8, $9, 'created')",
+        "insert into computers (id, account_id, name, size, cpu, memory_gb, disk_gb, state, compute_ref, wake_requested_at, wake_cause, time_zone)
+         values ($1, $2, $3, $4, $5, $6, $7, 'asleep', $8, $9, 'created', $10)",
     )
     .bind(id)
     .bind(auth.account.id)
@@ -142,6 +142,7 @@ pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewCo
     .bind(disk_gb)
     .bind(&compute_ref)
     .bind(app.now())
+    .bind(&auth.user.time_zone)
     .execute(&mut *tx)
     .await?;
     let apps = b.apps.unwrap_or_else(|| APPS.iter().map(|s| s.to_string()).collect());

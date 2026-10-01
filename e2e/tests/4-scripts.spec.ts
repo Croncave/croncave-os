@@ -31,7 +31,7 @@ test('add a script, run it now with live output, see its summary and the files i
 	await expect(page.getByText(/runs jobs at most every hour/)).toBeVisible();
 	await page.getByLabel('Cron schedule').fill('0 9 * * *');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
-	await expect(page.getByText('Every day at 9:00 am UTC')).toBeVisible();
+	await expect(page.getByText('Every day at 9:00 am ET')).toBeVisible();
 });
 
 test('a failing script says why in plain words, with the fix', async ({ page }) => {

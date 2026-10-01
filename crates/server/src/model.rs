@@ -17,6 +17,7 @@ pub struct User {
     pub last_seen_at: Option<DateTime<Utc>>,
     pub previous_seen_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    pub time_zone: String,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -78,6 +79,7 @@ pub struct Computer {
     pub agent_version: Option<String>,
     pub note: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub time_zone: String,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -102,6 +104,7 @@ pub struct Job {
     pub created_by_kind: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub time_zone: String,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
