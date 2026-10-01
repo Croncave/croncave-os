@@ -6,7 +6,7 @@
 	onMount(async () => {
 		try {
 			const me = await refreshMe();
-			goto(me.signup_step !== 'done' ? '/signup' : me.computers.length ? '/home' : '/computers/new', { replaceState: true });
+			goto(me.signup_step !== 'done' ? '/signup' : me.computers.length ? '/home' : '/welcome', { replaceState: true });
 		} catch {
 			goto('/signin', { replaceState: true });
 		}

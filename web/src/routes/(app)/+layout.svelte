@@ -18,7 +18,7 @@
 			.then((me) => {
 				if (me.signup_step !== 'done') return goto('/signup');
 				const free = ['/computers/new', '/plans', '/settings', '/usage', '/admin'];
-				if (!me.computers.length && !free.some((p) => page.url.pathname.startsWith(p))) return goto('/computers/new');
+				if (!me.computers.length && !free.some((p) => page.url.pathname.startsWith(p))) return goto('/welcome');
 				ready = true;
 				connectLive();
 			})

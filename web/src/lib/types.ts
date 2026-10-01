@@ -29,6 +29,7 @@ export type Computer = {
 	agent_version: string | null;
 	created_at: string;
 	state_changed_at: string;
+	time_zone: string;
 };
 
 export type Me = {
@@ -37,6 +38,7 @@ export type Me = {
 		email: string;
 		name: string;
 		phone: string | null;
+		time_zone: string;
 		is_admin: boolean;
 		prefs: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 		previous_seen_at: string | null;

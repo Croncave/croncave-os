@@ -56,7 +56,7 @@ pub async fn me(State(app): State<AppState>, auth: Auth) -> ApiResult<Json<Value
         });
     }
     Ok(Json(json!({
-        "user": { "id": auth.user.id, "email": auth.user.email, "name": auth.user.name, "phone": auth.user.phone,
+        "user": { "id": auth.user.id, "email": auth.user.email, "name": auth.user.name, "phone": auth.user.phone, "time_zone": auth.user.time_zone,
                   "is_admin": auth.user.is_admin, "prefs": auth.user.prefs, "previous_seen_at": previous },
         "account": auth.account,
         "signup_step": step,
@@ -67,6 +67,17 @@ pub async fn me(State(app): State<AppState>, auth: Auth) -> ApiResult<Json<Value
         "clock_offset_secs": app.clock.offset_secs(),
         "now": now,
     })))
+}
+
+/// What the signed-out pages need to know: whether this is a prototype with dev tools, so
+/// the sign-in screens can point at the outbox where links and codes land.
+pub async fn public_config(State(app): State<AppState>) -> Json<Value> {
+    Json(json!({ "dev_tools": app.cfg.dev_tools }))
+}
+
+/// The US time zones to choose from, with each one's offset right now.
+pub async fn time_zones(State(app): State<AppState>) -> Json<Value> {
+    Json(json!({ "zones": crate::zones::list(app.real_now()) }))
 }
 
 #[derive(Deserialize)]

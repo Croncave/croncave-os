@@ -25,7 +25,7 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
 	});
 	if (!res.ok) {
 		const j = await res.json().catch(() => ({}));
-		if (res.status === 401 && !path.startsWith('/auth') && !location.pathname.startsWith('/signin')) {
+		if (res.status === 401 && !path.startsWith('/auth') && !['/signin', '/join'].some((p) => location.pathname.startsWith(p))) {
 			await goto('/signin');
 		}
 		throw new ApiError(j.error ?? res.statusText, res.status, j.code ?? null);

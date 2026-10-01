@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Brand from '../Brand.svelte';
+	import Mark from '$lib/shell/Mark.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import { get, post, message } from '$lib/api';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -41,7 +41,7 @@
 </script>
 
 <main class="page" style="margin: 0 auto">
-	<div class="page-head"><Brand /><a href="/">Back to Croncave</a></div>
+	<div class="page-head"><div class="row"><Mark /><strong>Croncave dev tools</strong></div><a href="/">Back to Croncave</a></div>
 	<h1>Dev tools</h1>
 	{#if error}<div class="banner bad">{error} (Dev tools need DEV_TOOLS=true.)</div>{/if}
 	<div class="grid2">

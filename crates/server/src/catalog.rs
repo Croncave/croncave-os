@@ -63,6 +63,12 @@ pub struct Plan {
     pub parallel_agents: i64,
     pub support: String,
     pub trial: Option<Trial>,
+    /// One line on who the plan is for, shown on its card.
+    #[serde(default)]
+    pub tagline: String,
+    /// The plan the sign-up highlights.
+    #[serde(default)]
+    pub recommended: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

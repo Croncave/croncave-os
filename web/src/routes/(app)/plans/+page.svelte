@@ -138,7 +138,7 @@
 			<h2>Plans</h2>
 			<div class="plans">
 				{#each plans as p (p.id)}
-					<PlanCard id={p.id} plan={p.plan} sizes={null} current={p.id === b.plan_id}>
+					<PlanCard id={p.id} plan={p.plan} current={p.id === b.plan_id}>
 						{#if p.id !== b.plan_id}
 							<Button size="sm" variant={p.id === b.trial?.plan ? 'primary' : 'ghost'} onclick={() => (changing = p.id)}>{p.id === b.trial?.plan ? `Keep ${p.plan.name}` : `Switch to ${p.plan.name}`}</Button>
 						{/if}

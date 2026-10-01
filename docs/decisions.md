@@ -3,6 +3,34 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Schedules run in the computer's time zone, chosen at sign-up
+
+**Decision.** The sign-up's "Your details and phone" step asks for a time zone from the US zones (Eastern
+through Chamorro, `crates/server/src/zones.rs`). A new computer takes its owner's zone; each job carries its
+computer's zone, and the scheduler reads cron hours in it (`chrono-tz`), so "every day at 9 AM" means 9 AM
+there, through daylight-saving changes. Schedules are described with the zone ("Every day at 9:00 am ET").
+Existing rows default to Eastern (`0002_time_zones.sql`); before this, schedules were UTC.
+
+Smaller calls in the sign-up, all from the Sign in and Plans and Billing canvases:
+- **Sign in and Create account are separate pages** (`/signin`, `/join`) over the same one-time email link.
+- **The link expires in 15 minutes**, as the canvas says, not 30.
+- **The phone code is six boxes** that check themselves when the last digit lands; pasting fills them all.
+- **The paid-plan checkout is a dialog over the plans** (the canvases have no checkout screen; payment is the
+  mock provider's card form, as before).
+- **Plan cards take a tagline and a "recommended" flag from the catalog** (`tagline`, `recommended`), and
+  their checklists are worded from the catalog's numbers, so the cards stay true when the catalog changes.
+- **First run is a page of its own** (`/welcome`, "Set up your first computer"), with the catalog's sizes as the
+  starting points. Picking one creates "My computer" at that size; sizes above the plan's largest say which
+  plan they need; "Start from scratch" opens the full form.
+
+**Why.** The designs ask for the time zone at sign-up and show "Used for schedules like every day at 9 AM" in a
+computer's settings; schedules in UTC would surprise everyone outside it. Carrying the zone on the job keeps
+the scheduler's due-job query a single table scan.
+
+**Alternatives.** A zone per person only (computers can live in other zones, and Settings › This computer has
+its own picker). Store cron in UTC and convert at save time (wrong half the year, across daylight saving).
+Every IANA zone (Croncave is US only; the list is the eleven the design shows).
+
 ## 2026-10-01: The web app follows the design canvases screen by screen
 
 **Decision** (the founder's calls, asked before building):

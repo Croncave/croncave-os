@@ -28,6 +28,8 @@ pub fn router(app: AppState) -> Router {
         .route("/me/prefs", post(accounts::update_prefs))
         .route("/me/audit", get(accounts::audit_log))
         .route("/schemes/{id}", get(accounts::scheme))
+        .route("/time-zones", get(accounts::time_zones))
+        .route("/config", get(accounts::public_config))
         // Plans and billing
         .route("/plans", get(billing::plans))
         .route("/signup/plan", post(billing::choose_plan))

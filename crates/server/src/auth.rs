@@ -108,7 +108,7 @@ pub async fn send_link(State(app): State<AppState>, Json(b): Json<EmailBody>) ->
     sqlx::query("insert into sign_in_tokens (token_hash, email, expires_at) values ($1, $2, $3)")
         .bind(crypto::hash(&token))
         .bind(&email)
-        .bind(app.real_now() + Duration::minutes(30))
+        .bind(app.real_now() + Duration::minutes(15))
         .execute(&app.db)
         .await?;
     let link = format!("{}/auth/verify?token={token}", app.cfg.web_url);
@@ -118,7 +118,7 @@ pub async fn send_link(State(app): State<AppState>, Json(b): Json<EmailBody>) ->
             channel: Channel::Email,
             to: email.clone(),
             subject: "Your Croncave sign-in link".into(),
-            body: format!("Open this link to sign in to Croncave. It works once, for 30 minutes.\n\n{link}"),
+            body: format!("Open this link to sign in to Croncave. It works once, for 15 minutes.\n\n{link}"),
             link: Some(link),
         })
         .await?;
@@ -207,6 +207,9 @@ async fn create_user(app: &AppState, email: &str) -> ApiResult<Uuid> {
 #[derive(Deserialize)]
 pub struct PhoneBody {
     pub phone: String,
+    /// Sent with the phone on the sign-up's "Your details" step.
+    pub name: Option<String>,
+    pub time_zone: Option<String>,
 }
 
 /// US numbers only: ten digits with a valid area code, stored as +1XXXXXXXXXX.
@@ -229,6 +232,18 @@ pub async fn send_code(State(app): State<AppState>, auth: Auth, Json(b): Json<Ph
     let phone = normalize_us_phone(&b.phone).ok_or_else(|| {
         ApiError::bad("Enter a US mobile number. Croncave is only available in the United States for now.")
     })?;
+    if let Some(z) = &b.time_zone
+        && crate::zones::find(z).is_none()
+    {
+        return Err(ApiError::bad("Choose one of the US time zones."));
+    }
+    let name = b.name.as_deref().map(|n| n.trim().chars().take(60).collect::<String>()).filter(|n| !n.is_empty());
+    sqlx::query("update users set name = coalesce($2, name), time_zone = coalesce($3, time_zone) where id = $1")
+        .bind(auth.user.id)
+        .bind(name)
+        .bind(&b.time_zone)
+        .execute(&app.db)
+        .await?;
     let (recent,): (i64,) = sqlx::query_as("select count(*) from phone_codes where user_id = $1 and expires_at > $2")
         .bind(auth.user.id)
         .bind(app.real_now())

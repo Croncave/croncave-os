@@ -36,15 +36,14 @@ export async function signUp(page: Page, opts: SignUp = {}): Promise<string> {
 	const number = phone();
 	await page.goto('/signin');
 	await page.getByLabel('Email').fill(email);
-	await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
-	await expect(page.getByText('Check your email')).toBeVisible();
+	await page.getByRole('button', { name: 'Send sign-in link' }).click();
+	await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 	await page.goto(await signInLink(page.request, email));
-	await page.waitForURL(/\/(signup|home|computers\/new)/);
+	await page.waitForURL(/\/(signup|home|welcome)/);
 	if (!page.url().includes('/signup')) return email;
 	await page.getByLabel('Mobile number').fill(number);
-	await page.getByRole('button', { name: 'Text me a code' }).click();
-	await page.getByLabel('Code').fill(await smsCode(page.request, number));
-	await page.getByRole('button', { name: 'Verify' }).click();
+	await page.getByRole('button', { name: 'Send code' }).click();
+	await page.getByLabel('Code', { exact: true }).fill(await smsCode(page.request, number));
 	await expect(page.getByRole('heading', { name: 'Choose a plan' })).toBeVisible();
 	const plan = opts.plan ?? 'free';
 	await page.locator(`[data-plan=${plan}]`).getByRole('button').click();
@@ -53,8 +52,11 @@ export async function signUp(page: Page, opts: SignUp = {}): Promise<string> {
 		await page.getByLabel('Security code').fill('123');
 		await page.getByRole('button', { name: /^Pay/ }).click();
 	}
-	await page.getByRole('button', { name: opts.trial ? 'Start the free trial' : /No thanks|Create your first computer/ }).click();
-	await page.waitForURL(/computers\/new|home/);
+	// Plans with a trial to offer show it next; the others go straight on.
+	const offer = page.getByRole('dialog', { name: /^Try / });
+	await Promise.race([offer.waitFor(), page.waitForURL(/welcome|home/)]);
+	if (await offer.isVisible()) await page.getByRole('button', { name: opts.trial ? /^Start my .* trial$/ : /^Stay on / }).click();
+	await page.waitForURL(/welcome|home/);
 	return email;
 }
 

@@ -52,7 +52,7 @@
 		try {
 			await del(`/computers/${c.id}`);
 			await refreshMe();
-			goto(session.me?.computers.length ? '/home' : '/computers/new');
+			goto(session.me?.computers.length ? '/home' : '/welcome');
 		} catch (e) {
 			toast(message(e), true);
 		}
