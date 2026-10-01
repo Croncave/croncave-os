@@ -17,7 +17,7 @@ test('a computer wakes, sleeps about 30 seconds after nothing is active, and wak
 	await page.goto('/files');
 	await expect(switcher).toContainText(/Waking up|Awake/);
 	await expect(switcher).toContainText('Awake');
-	await expect(page.getByText('This folder is empty')).toBeVisible();
+	await expect(page.getByRole('heading', { name: "Your computer's files live here" })).toBeVisible();
 
 	// Put it to sleep, then a scheduled job wakes it: move time to the job's slot.
 	const me = await api(page, 'GET', '/me');

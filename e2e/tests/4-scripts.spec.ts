@@ -17,7 +17,7 @@ test('add a script, run it now with live output, see its summary and the files i
 	await expect(page.getByTestId('headline')).toHaveText('10 sales summarized; East sold the most');
 	await expect(page.getByText('Top region')).toBeVisible();
 	await page.getByRole('link', { name: 'Scripts/csv-report/summary.csv' }).click();
-	await expect(page.getByTestId('file-row').filter({ hasText: 'summary.csv' })).toContainText('Made by "Sales summary"');
+	await expect(page.getByTestId('file-row').filter({ hasText: 'summary.csv' })).toContainText('Sales summary · run at');
 	await expect(page.getByTestId('preview-table')).toContainText('West');
 
 	// A schedule faster than the Free plan allows is refused in plain words.

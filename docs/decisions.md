@@ -3,6 +3,26 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Files' menu actions are real: zips, copies between computers, pins and Recent
+
+**Decision.** The Files design's right-click menu and sidebar work end to end:
+- **Folders download as a zip** made on the computer (in its system area, removed after sending).
+- **Copy to another computer** streams the file, or the folder as a zip, through the control plane in 1 MB
+  chunks into the other computer's resumable upload, which unpacks a zip into place. Both computers wake for it.
+  Anything already at the destination goes to that computer's Trash, never overwritten.
+- **Pins are a per-person preference** (`prefs.pins`, by computer), not a property of the folder.
+- **Recent** is the newest files anywhere in the root, found by the agent (it stops looking after 50,000
+  entries so a huge disk can't stall it).
+- **Folders show how many things they hold**, and Trash shows days left (30, the agent's
+  `CRONCAVE_TRASH_DAYS`).
+- **"Open in Data" is shown but off**, because Data is coming soon.
+
+**Why.** The design shows each of these; the founder asked for behavior behind every control.
+
+**Alternatives.** Copy computer to computer directly (computers never listen, so the control plane relays it
+anyway). Copy by re-uploading from the browser (slow, and the browser would need the file). Store pins on the
+folder (they'd follow the folder to every person on a shared computer).
+
 ## 2026-10-01: Schedules run in the computer's time zone, chosen at sign-up
 
 **Decision.** The sign-up's "Your details and phone" step asks for a time zone from the US zones (Eastern
