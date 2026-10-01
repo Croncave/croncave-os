@@ -24,6 +24,8 @@ pub struct ComputerSpec {
 pub struct Boot {
     pub relay_url: String,
     pub bootstrap_token: String,
+    /// Environment for the agent and the work it runs.
+    pub env: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,11 +60,9 @@ pub trait ComputeDriver: Send + Sync {
 pub fn from_config(cfg: &crate::config::Config) -> anyhow::Result<std::sync::Arc<dyn ComputeDriver>> {
     Ok(match cfg.compute_driver.as_str() {
         "local" => std::sync::Arc::new(LocalDriver::new(cfg.data_dir.join("computers"), absolute(&cfg.agent_bin)?)),
-        "docker" => std::sync::Arc::new(DockerDriver::new(
-            cfg.data_dir.join("computers"),
-            absolute(&cfg.agent_bin)?,
-            cfg.docker_image.clone(),
-        )),
+        "docker" => {
+            std::sync::Arc::new(DockerDriver::new(absolute(&cfg.data_dir.join("computers"))?, cfg.docker_image.clone()))
+        }
         "fly" => std::sync::Arc::new(FlyDriver { token: cfg.fly_api_token.clone(), app: cfg.fly_app.clone() }),
         other => anyhow::bail!("COMPUTE_DRIVER={other} isn't a driver (use local, docker or fly)"),
     })
@@ -156,6 +156,7 @@ impl ComputeDriver for LocalDriver {
             .env("CRONCAVE_BOOTSTRAP_TOKEN", &boot.bootstrap_token)
             .env("CRONCAVE_DISK", dir.join("disk"))
             .envs(passthrough_env())
+            .envs(boot.env.iter().cloned())
             .stdin(std::process::Stdio::null())
             .stdout(log)
             .stderr(log2)
@@ -239,19 +240,19 @@ fn passthrough_env() -> Vec<(String, String)> {
 
 // ---------------------------------------------------------------------------------------
 
-/// Each computer is a container with its disk mounted, its own network namespace and
-/// CPU and memory limits. The agent binary is mounted read-only. The relay address must
-/// be reachable from containers (e.g. `RELAY_URL=http://host.docker.internal:8080` with
-/// the control plane listening on 0.0.0.0).
+/// Each computer is a container from the computer image (docker/computer.Dockerfile),
+/// with its disk bind-mounted, its own network namespace, and CPU and memory limits. The
+/// agent inside dials out to the relay at `host.docker.internal`; nothing in the
+/// container is published. A container is made at each start and removed at stop; the
+/// disk is what persists.
 pub struct DockerDriver {
     base: PathBuf,
-    agent_bin: PathBuf,
     image: String,
 }
 
 impl DockerDriver {
-    pub fn new(base: PathBuf, agent_bin: PathBuf, image: String) -> Self {
-        Self { base, agent_bin, image }
+    pub fn new(base: PathBuf, image: String) -> Self {
+        Self { base, image }
     }
 
     async fn docker(args: &[&str]) -> Result<String, DriverError> {
@@ -265,6 +266,14 @@ impl DockerDriver {
         }
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     }
+
+    fn dir(&self, compute_ref: &str) -> Result<PathBuf, DriverError> {
+        if !compute_ref.starts_with("croncave-") || !compute_ref.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            return Err(DriverError::Failed("bad computer reference".into()));
+        }
+        Ok(self.base.join(compute_ref))
+    }
 }
 
 #[async_trait]
@@ -274,59 +283,74 @@ impl ComputeDriver for DockerDriver {
     }
 
     async fn create(&self, spec: &ComputerSpec) -> Result<String, DriverError> {
+        Self::docker(&["image", "inspect", &self.image]).await.map_err(|_| {
+            DriverError::NotConfigured(format!(
+                "The computer image {} isn't built. Run scripts/build-computer-image.sh.",
+                self.image
+            ))
+        })?;
         let compute_ref = format!("croncave-{}", spec.id.simple());
-        std::fs::create_dir_all(self.base.join(&compute_ref).join("disk/root"))
+        std::fs::create_dir_all(self.dir(&compute_ref)?.join("disk/root"))
             .map_err(|e| DriverError::Failed(e.to_string()))?;
         Ok(compute_ref)
     }
 
     async fn start(&self, compute_ref: &str, spec: &ComputerSpec, boot: &Boot) -> Result<(), DriverError> {
+        if self.status(compute_ref).await? == DriverStatus::Running {
+            return Ok(());
+        }
         let _ = Self::docker(&["rm", "-f", compute_ref]).await;
-        let disk = std::fs::canonicalize(self.base.join(compute_ref).join("disk"))
-            .map_err(|e| DriverError::Failed(e.to_string()))?;
+        let disk = self.dir(compute_ref)?.join("disk");
         let cpus = spec.cpu.to_string();
         let memory = format!("{}g", spec.memory_gb);
-        let disk_mount = format!("{}:/croncave/disk", disk.display());
-        let agent_mount = format!("{}:/usr/local/bin/croncave-agent:ro", self.agent_bin.display());
-        let env = [
+        let mount = format!("type=bind,source={},target=/croncave/disk", disk.display());
+        let label = format!("croncave.computer={}", spec.id);
+        let base_label = format!("croncave.base={}", self.base.display());
+        let mut env = vec![
             format!("CRONCAVE_RELAY_URL={}", boot.relay_url),
             format!("CRONCAVE_COMPUTER_ID={}", spec.id),
             format!("CRONCAVE_BOOTSTRAP_TOKEN={}", boot.bootstrap_token),
             "CRONCAVE_DISK=/croncave/disk".to_string(),
+            "HOME=/croncave/disk/root".to_string(),
         ];
+        env.extend(boot.env.iter().map(|(k, v)| format!("{k}={v}")));
         let mut args = vec![
             "run",
             "-d",
+            "--init",
             "--name",
             compute_ref,
+            "--label",
+            &label,
+            "--label",
+            &base_label,
             "--cpus",
             &cpus,
             "--memory",
             &memory,
             "--add-host",
             "host.docker.internal:host-gateway",
-            "-v",
-            &disk_mount,
-            "-v",
-            &agent_mount,
+            "--mount",
+            &mount,
         ];
         for e in &env {
             args.push("-e");
             args.push(e);
         }
         args.push(&self.image);
-        args.push("/usr/local/bin/croncave-agent");
         Self::docker(&args).await.map(|_| ())
     }
 
     async fn stop(&self, compute_ref: &str) -> Result<(), DriverError> {
-        let _ = Self::docker(&["stop", "-t", "3", compute_ref]).await;
+        self.dir(compute_ref)?;
+        // SIGTERM first: the agent ends its runs, then exits.
+        let _ = Self::docker(&["stop", "-t", "5", compute_ref]).await;
         let _ = Self::docker(&["rm", "-f", compute_ref]).await;
         Ok(())
     }
 
     async fn status(&self, compute_ref: &str) -> Result<DriverStatus, DriverError> {
-        if !self.base.join(compute_ref).exists() {
+        if !self.dir(compute_ref)?.exists() {
             return Ok(DriverStatus::Missing);
         }
         match Self::docker(&["inspect", "-f", "{{.State.Running}}", compute_ref]).await {
@@ -338,9 +362,25 @@ impl ComputeDriver for DockerDriver {
 
     async fn destroy(&self, compute_ref: &str) -> Result<(), DriverError> {
         self.stop(compute_ref).await?;
-        let dir = self.base.join(compute_ref);
+        let dir = self.dir(compute_ref)?;
         if dir.exists() {
-            std::fs::remove_dir_all(dir).map_err(|e| DriverError::Failed(e.to_string()))?;
+            // Files made inside the container belong to its root user; remove them from inside.
+            if std::fs::remove_dir_all(&dir).is_err() {
+                let mount = format!("type=bind,source={},target=/d", dir.display());
+                let _ = Self::docker(&[
+                    "run",
+                    "--rm",
+                    "--mount",
+                    &mount,
+                    "--entrypoint",
+                    "sh",
+                    &self.image,
+                    "-c",
+                    "rm -rf /d/*",
+                ])
+                .await;
+                std::fs::remove_dir_all(&dir).map_err(|e| DriverError::Failed(e.to_string()))?;
+            }
         }
         Ok(())
     }

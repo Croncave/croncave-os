@@ -1,10 +1,10 @@
 {
   "id": "page-contains",
-  "version": 1,
+  "version": 2,
   "name": "Words on a page",
   "description": "Tell me when a page mentions something, like \"In stock\" or \"Tickets available\".",
   "inputs": [
-    { "key": "url", "label": "Page address", "kind": { "type": "url" }, "required": true, "default": "http://127.0.0.1:8080/demo/page" },
+    { "key": "url", "label": "Page address", "kind": { "type": "url" }, "required": true, "default": "{{demo}}/demo/page" },
     { "key": "text", "label": "Words to look for", "kind": { "type": "text" }, "required": true, "default": "Open on Sundays" }
   ],
   "source": { "type": "http", "url": "{url}" },

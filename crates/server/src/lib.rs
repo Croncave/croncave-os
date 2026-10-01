@@ -69,6 +69,11 @@ pub async fn serve(cfg: config::Config) -> anyhow::Result<()> {
     let api = tokio::net::TcpListener::bind(api_addr).await?;
     let previews = tokio::net::TcpListener::bind(preview_addr).await?;
     tracing::info!(%api_addr, %preview_addr, driver = app.providers.compute.name(), "Croncave control plane listening");
+    if let Some(addr) = app.cfg.relay_addr {
+        let relay = tokio::net::TcpListener::bind(addr).await?;
+        tracing::info!(%addr, "relay also listening for computers");
+        tokio::spawn(axum::serve(relay, api::relay_router(app.clone())).into_future());
+    }
     let a = axum::serve(api, api::router(app.clone()).layer(tower_http::trace::TraceLayer::new_for_http()));
     let p = axum::serve(previews, preview_edge::router(app.clone()));
     tokio::try_join!(async { a.await }, async { p.await })?;

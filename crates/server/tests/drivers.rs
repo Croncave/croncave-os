@@ -14,7 +14,7 @@ use uuid::Uuid;
 async fn suite(driver: &dyn ComputeDriver, disk_of: impl Fn(&str) -> std::path::PathBuf) {
     let spec = ComputerSpec { id: Uuid::new_v4(), cpu: 1, memory_gb: 1, disk_gb: 10 };
     // A relay nobody answers: the agent keeps retrying, which is enough to be "running".
-    let boot = Boot { relay_url: "http://127.0.0.1:9".into(), bootstrap_token: "t".into() };
+    let boot = Boot { relay_url: "http://127.0.0.1:9".into(), bootstrap_token: "t".into(), env: vec![] };
 
     let r = driver.create(&spec).await.expect("create");
     assert_eq!(driver.status(&r).await.unwrap(), DriverStatus::Stopped, "a new computer is asleep");
@@ -50,14 +50,20 @@ async fn local_driver_passes_the_shared_suite() {
 
 #[tokio::test]
 async fn docker_driver_passes_the_shared_suite_when_docker_runs() {
-    let up = std::process::Command::new("docker").arg("info").output().map(|o| o.status.success()).unwrap_or(false);
-    if !up {
-        eprintln!("skipped: no Docker daemon");
+    // scripts/check.sh builds the computer image whenever a Docker daemon is up.
+    let image = std::env::var("COMPUTER_IMAGE").unwrap_or_else(|_| "croncave-computer:dev".into());
+    let ready = std::process::Command::new("docker")
+        .args(["image", "inspect", &image])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !ready {
+        eprintln!("skipped: no Docker daemon or no {image} image (scripts/build-computer-image.sh)");
         return;
     }
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().to_path_buf();
-    let driver = DockerDriver::new(base.clone(), common::agent_bin(), "debian:stable-slim".into());
+    let driver = DockerDriver::new(base.clone(), image);
     suite(&driver, |r| base.join(r).join("disk")).await;
 }
 

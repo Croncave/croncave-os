@@ -26,6 +26,16 @@ pub fn builtin_types() -> Vec<WatcherType> {
     .collect()
 }
 
+/// Built-in demo types read the local demo sites; `{{demo}}` is where computers reach them
+/// (the host itself for the local driver, the Docker bridge for containers).
+fn with_demo(config: Value, demo: &str) -> Value {
+    let text = config.to_string();
+    if !text.contains("{{demo}}") {
+        return config;
+    }
+    serde_json::from_str(&text.replace("{{demo}}", demo.trim_end_matches('/'))).unwrap_or(config)
+}
+
 /// The newest approved version of a type this account may use.
 pub async fn load_type(app: &AppState, auth: &Auth, id: &str) -> ApiResult<WatcherType> {
     let row: Option<(Value,)> = sqlx::query_as(
@@ -37,7 +47,8 @@ pub async fn load_type(app: &AppState, auth: &Auth, id: &str) -> ApiResult<Watch
     .fetch_optional(&app.db)
     .await?;
     let (config,) = row.ok_or_else(|| ApiError::not_found("That watch type"))?;
-    serde_json::from_value(config).map_err(|_| ApiError::bad("That watch type is damaged."))
+    serde_json::from_value(with_demo(config, &app.cfg.demo_url))
+        .map_err(|_| ApiError::bad("That watch type is damaged."))
 }
 
 pub async fn build_setup(app: &AppState, auth: &Auth, type_id: &str, inputs: &Map<String, Value>) -> ApiResult<Value> {
@@ -67,6 +78,7 @@ pub async fn types(State(app): State<AppState>, auth: Auth) -> ApiResult<Json<Va
     let types: Vec<Value> = rows
         .into_iter()
         .map(|(id, version, config, origin, approved)| {
+            let config = with_demo(config, &app.cfg.demo_url);
             let reads = match config.pointer("/source/type").and_then(Value::as_str) {
                 Some("http") => match config.pointer("/source/url").and_then(Value::as_str).unwrap_or("") {
                     u if u.contains('{') => "Reads the web page you give it, from your computer".to_string(),

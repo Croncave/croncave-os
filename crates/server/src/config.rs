@@ -12,6 +12,12 @@ pub struct Config {
     pub preview_domain: String,
     pub web_url: String,
     pub relay_url: String,
+    /// An extra address serving only the relay and the demo sites, for computers that
+    /// can't reach `api_addr` (Docker containers reach the host through its bridge).
+    pub relay_addr: Option<SocketAddr>,
+    /// Where computers reach the demo sites the Watcher's demo types read (by default the
+    /// relay's address, since computers reach that already).
+    pub demo_url: String,
     pub compute_driver: String,
     pub payments: String,
     pub notifier: String,
@@ -45,13 +51,16 @@ impl Config {
         let relay_secret = opt("RELAY_SECRET")
             .ok_or_else(|| anyhow::anyhow!("RELAY_SECRET is not set (scripts/dev.sh generates one in .env)"))?
             .into_bytes();
+        let relay_url = get("RELAY_URL", "http://127.0.0.1:8080");
         Ok(Self {
             database_url,
             api_addr: get("API_ADDR", "127.0.0.1:8080").parse()?,
             preview_addr: get("PREVIEW_ADDR", "127.0.0.1:8081").parse()?,
             preview_domain: get("PREVIEW_DOMAIN", "preview.localhost:8081"),
             web_url: get("WEB_URL", "http://localhost:5173"),
-            relay_url: get("RELAY_URL", "http://127.0.0.1:8080"),
+            demo_url: opt("DEMO_URL").unwrap_or_else(|| relay_url.clone()),
+            relay_url,
+            relay_addr: opt("RELAY_ADDR").map(|a| a.parse()).transpose()?,
             compute_driver: get("COMPUTE_DRIVER", "local"),
             payments: get("PAYMENTS", "mock"),
             notifier: get("NOTIFIER", "outbox"),
@@ -59,7 +68,7 @@ impl Config {
             market_data: get("MARKET_DATA", "mock"),
             data_dir: PathBuf::from(get("DATA_DIR", ".dev/data")),
             agent_bin: PathBuf::from(get("AGENT_BIN", "target/debug/croncave-agent")),
-            docker_image: get("DOCKER_IMAGE", "python:3.12-slim"),
+            docker_image: get("COMPUTER_IMAGE", "croncave-computer:dev"),
             fly_api_token: opt("FLY_API_TOKEN"),
             fly_app: opt("FLY_APP"),
             secrets_key,
@@ -84,6 +93,8 @@ impl Config {
             preview_domain: "preview.localhost".into(),
             web_url: "http://localhost:5173".into(),
             relay_url: "http://127.0.0.1:0".into(),
+            relay_addr: None,
+            demo_url: "http://127.0.0.1:8080".into(),
             compute_driver: "local".into(),
             payments: "mock".into(),
             notifier: "outbox".into(),
@@ -91,7 +102,7 @@ impl Config {
             market_data: "mock".into(),
             data_dir,
             agent_bin: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/croncave-agent"),
-            docker_image: "python:3.12-slim".into(),
+            docker_image: "croncave-computer:dev".into(),
             fly_api_token: None,
             fly_app: None,
             secrets_key: [7u8; 32],

@@ -1,10 +1,10 @@
 {
   "id": "demo-listings",
-  "version": 1,
+  "version": 2,
   "name": "Apartment listings (demo site)",
   "description": "Tell me about new apartments that match what I want. Reads the local demo listings site.",
   "inputs": [
-    { "key": "url", "label": "Listings page", "kind": { "type": "url" }, "required": true, "default": "http://127.0.0.1:8080/demo/listings" },
+    { "key": "url", "label": "Listings page", "kind": { "type": "url" }, "required": true, "default": "{{demo}}/demo/listings" },
     { "key": "max_price", "label": "Most rent per month", "kind": { "type": "number" }, "default": "2200" },
     { "key": "min_beds", "label": "Fewest bedrooms", "kind": { "type": "number" }, "default": "1" },
     { "key": "area", "label": "Neighborhood contains", "kind": { "type": "text" } }

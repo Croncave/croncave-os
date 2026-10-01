@@ -6,6 +6,16 @@ use axum::routing::{delete, get, post, put};
 use crate::state::AppState;
 use crate::*;
 
+/// What computers may reach on the extra relay address: the relay and the demo sites,
+/// never the API.
+pub fn relay_router(app: AppState) -> Router {
+    Router::new()
+        .route("/demo/listings", get(demo::listings))
+        .route("/demo/page", get(demo::page))
+        .with_state(app.clone())
+        .merge(app.relay.router())
+}
+
 pub fn router(app: AppState) -> Router {
     let mut api = Router::new()
         // Sign-in and the person

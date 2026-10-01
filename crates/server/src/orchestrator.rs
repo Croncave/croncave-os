@@ -238,7 +238,11 @@ async fn start(app: &AppState, c: &Computer) -> ApiResult<()> {
         .await?;
     events::live(&app.db, c.account_id, "computer", &c.id.to_string(), json!({ "state": "waking" })).await?;
     let spec = ComputerSpec { id: c.id, cpu: c.cpu, memory_gb: c.memory_gb, disk_gb: c.disk_gb };
-    let boot = Boot { relay_url: app.cfg.relay_url.clone(), bootstrap_token: token };
+    let boot = Boot {
+        relay_url: app.cfg.relay_url.clone(),
+        bootstrap_token: token,
+        env: vec![("CRONCAVE_DEMO_URL".into(), app.cfg.demo_url.clone())],
+    };
     if let Err(e) = app.providers.compute.start(c.compute_ref.as_deref().unwrap_or_default(), &spec, &boot).await {
         sqlx::query("update computers set state = 'asleep', state_changed_at = $2, wake_requested_at = null, note = $3 where id = $1")
             .bind(c.id)

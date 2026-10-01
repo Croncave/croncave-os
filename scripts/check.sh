@@ -25,6 +25,8 @@ for db in $(psql "$DATABASE_URL" -tAc "select datname from pg_database where dat
   psql "$DATABASE_URL" -qc "drop database if exists $db with (force)" >/dev/null
 done
 cargo build --quiet -p croncave-agent
+# With Docker running, the compute driver suite also runs against the Docker driver.
+if docker info >/dev/null 2>&1; then ./scripts/build-computer-image.sh; fi
 cargo test --workspace --quiet
 
 if [ -d web ]; then

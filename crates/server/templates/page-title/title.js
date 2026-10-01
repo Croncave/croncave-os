@@ -1,5 +1,5 @@
 // Fetch a page and print its title. Change URL to any page.
-const URL = process.env.URL || "http://127.0.0.1:8080/demo/page";
+const URL = process.env.URL || `${process.env.CRONCAVE_DEMO_URL || "http://127.0.0.1:8080"}/demo/page`;
 const fs = require("fs");
 
 (async () => {

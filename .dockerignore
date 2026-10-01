@@ -1,0 +1,7 @@
+target
+.dev
+web
+e2e
+docs
+.git
+**/node_modules
