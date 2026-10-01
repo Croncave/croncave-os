@@ -62,8 +62,8 @@ pub async fn simulate_usage(State(app): State<AppState>, auth: Auth, Json(b): Js
     Ok(Json(json!({ "ok": true })))
 }
 
-pub async fn add_listing(State(app): State<AppState>) -> Json<Value> {
-    let l = app.demo.add_listing();
+pub async fn add_listing(State(app): State<AppState>, body: Option<Json<crate::demo::PlantListing>>) -> Json<Value> {
+    let l = app.demo.add_listing(body.map(|Json(b)| b));
     Json(json!({ "id": l.id, "title": l.title, "price": l.price, "beds": l.beds, "area": l.area }))
 }
 

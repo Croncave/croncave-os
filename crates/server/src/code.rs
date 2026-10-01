@@ -246,7 +246,7 @@ pub async fn start_dev_server(
 ) -> ApiResult<Json<Value>> {
     let c = crate::computers::load(&app, &auth, computer).await?;
     let project = b.project.trim_matches('/').to_string();
-    let port = b.port.unwrap_or(5173);
+    let port = b.port.unwrap_or(4321);
     if port < 1024 {
         return Err(ApiError::bad("Choose a port above 1023."));
     }

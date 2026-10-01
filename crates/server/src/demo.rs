@@ -18,6 +18,14 @@ pub struct Listing {
     pub beds: u32,
 }
 
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct PlantListing {
+    pub title: Option<String>,
+    pub area: Option<String>,
+    pub price: Option<u32>,
+    pub beds: Option<u32>,
+}
+
 pub struct DemoState {
     pub listings: Mutex<Vec<Listing>>,
     pub page: Mutex<(u32, String)>,
@@ -48,17 +56,18 @@ impl Default for DemoState {
 }
 
 impl DemoState {
-    /// Plant a new listing (Dev tools). Every few, one is cheap enough to match a typical watch.
-    pub fn add_listing(&self) -> Listing {
+    /// Plant a new listing (Dev tools): the one given, or a made-up one.
+    pub fn add_listing(&self, given: Option<PlantListing>) -> Listing {
         let mut l = self.listings.lock().expect("listings");
         let id = l.iter().map(|x| x.id).max().unwrap_or(0) + 1;
         let n = id as usize;
+        let g = given.unwrap_or_default();
         let listing = Listing {
             id,
-            title: format!("{} #{id}", KINDS[n % KINDS.len()]),
-            area: AREAS[n % AREAS.len()].into(),
-            price: 1600 + ((n * 373) % 1800) as u32,
-            beds: (n % 3) as u32 + 1,
+            title: g.title.unwrap_or_else(|| format!("{} #{id}", KINDS[n % KINDS.len()])),
+            area: g.area.unwrap_or_else(|| AREAS[n % AREAS.len()].into()),
+            price: g.price.unwrap_or(1600 + ((n * 373) % 1800) as u32),
+            beds: g.beds.unwrap_or((n % 3) as u32 + 1),
         };
         l.insert(0, listing.clone());
         listing

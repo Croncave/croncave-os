@@ -31,6 +31,6 @@
       { "field": "area", "op": "contains", "value": "{area}" }
     ]
   },
-  "rule": "Check {url} and tell me about new listings up to ${max_price} a month with at least {min_beds} bedrooms",
+  "rule": "Check {url} and tell me about new listings up to ${max_price} a month with {min_beds}+ bedrooms",
   "view": "items"
 }
