@@ -34,7 +34,15 @@ async fn files_trash_and_resumable_uploads() {
     s.put_bytes(&format!("/computers/{c}/uploads/{id}?offset={have}"), body[have..].to_vec()).await;
     let done = s.post(&format!("/computers/{c}/uploads/{id}/finish"), json!({ "path": "Data/blob.bin" })).await;
     assert_eq!(done["size"], 1_500_000);
-    let dl = s.client.get(format!("{}/api/computers/{c}/files/download?path=Data/blob.bin", s.base)).send().await.unwrap().bytes().await.unwrap();
+    let dl = s
+        .client
+        .get(format!("{}/api/computers/{c}/files/download?path=Data/blob.bin", s.base))
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
     assert_eq!(dl.to_vec(), body, "the download matches the upload byte for byte");
 
     // Preview a table, then delete it to Trash and restore it.
@@ -59,7 +67,12 @@ async fn scripts_report_results_and_trigger_on_file_changes() {
     s.sign_up("bo@example.com", "4155550112", "free", None, false).await;
     let c = computer(&s).await;
     s.post(&format!("/computers/{c}/scripts/template"), json!({ "template": "csv-report" })).await;
-    let made = s.post(&format!("/computers/{c}/scripts"), json!({ "name": "Report", "path": "Scripts/csv-report/report.py", "run_now": true })).await;
+    let made = s
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Report", "path": "Scripts/csv-report/report.py", "run_now": true }),
+        )
+        .await;
     let run = s.wait_run(made["run_id"].as_str().unwrap()).await;
     assert_eq!(run["status"], "succeeded", "{run}");
     assert_eq!(run["headline"], "10 sales summarized; East sold the most");
@@ -69,9 +82,18 @@ async fn scripts_report_results_and_trigger_on_file_changes() {
     assert_eq!(summary["source"]["label"], "Made by \"Report\"");
 
     // A script that deletes a file: Trash catches it, attributed to the run.
-    s.put_bytes(&format!("/computers/{c}/files/write?path=Scripts/clean.sh"), b"rm -f old.txt\necho cleaned\n".to_vec()).await;
+    s.put_bytes(
+        &format!("/computers/{c}/files/write?path=Scripts/clean.sh"),
+        b"rm -f old.txt\necho cleaned\n".to_vec(),
+    )
+    .await;
     s.put_bytes(&format!("/computers/{c}/files/write?path=Scripts/old.txt"), b"bye".to_vec()).await;
-    let clean = s.post(&format!("/computers/{c}/scripts"), json!({ "name": "Clean", "path": "Scripts/clean.sh", "run_now": true })).await;
+    let clean = s
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Clean", "path": "Scripts/clean.sh", "run_now": true }),
+        )
+        .await;
     let run = s.wait_run(clean["run_id"].as_str().unwrap()).await;
     assert_eq!(run["status"], "succeeded", "{run}");
     let trash = s.get(&format!("/computers/{c}/files/trash")).await;
@@ -79,20 +101,36 @@ async fn scripts_report_results_and_trigger_on_file_changes() {
 
     // A failure explained in plain words, with the fix.
     s.put_bytes(&format!("/computers/{c}/files/write?path=Scripts/broken.py"), b"import notapackage\n".to_vec()).await;
-    let broken = s.post(&format!("/computers/{c}/scripts"), json!({ "name": "Broken", "path": "Scripts/broken.py", "run_now": true })).await;
+    let broken = s
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Broken", "path": "Scripts/broken.py", "run_now": true }),
+        )
+        .await;
     let run = s.wait_run(broken["run_id"].as_str().unwrap()).await;
     assert_eq!(run["status"], "failed");
     assert!(run["error_plain"].as_str().unwrap().contains("notapackage"), "{run}");
     assert!(run["error_fix"].as_str().unwrap().contains("requirements.txt"));
 
     // "When files change": writing into Inbox runs the job.
-    s.put_bytes(&format!("/computers/{c}/files/write?path=Scripts/count.sh"), b"ls \"$CRONCAVE_FILES/Inbox\" | wc -l\n".to_vec()).await;
+    s.put_bytes(
+        &format!("/computers/{c}/files/write?path=Scripts/count.sh"),
+        b"ls \"$CRONCAVE_FILES/Inbox\" | wc -l\n".to_vec(),
+    )
+    .await;
     let job = s
-        .post(&format!("/computers/{c}/scripts"), json!({ "name": "Count", "path": "Scripts/count.sh", "trigger": "files", "watch_path": "Inbox" }))
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Count", "path": "Scripts/count.sh", "trigger": "files", "watch_path": "Inbox" }),
+        )
         .await;
     let job_id = job["job"]["id"].as_str().unwrap().to_string();
     s.put_bytes(&format!("/computers/{c}/files/write?path=Inbox/a.txt"), b"x".to_vec()).await;
-    let j = s.wait_for(&format!("/jobs/{job_id}"), "the file trigger", |v| v["runs"].as_array().is_some_and(|r| !r.is_empty())).await;
+    let j = s
+        .wait_for(&format!("/jobs/{job_id}"), "the file trigger", |v| {
+            v["runs"].as_array().is_some_and(|r| !r.is_empty())
+        })
+        .await;
     assert_eq!(j["runs"][0]["trigger"], "files");
 }
 
@@ -161,9 +199,18 @@ async fn an_agent_task_asks_before_running_and_its_changes_are_reviewed() {
     s.sign_up("ed@example.com", "4155550115", "free", None, false).await;
     let c = computer(&s).await;
     s.post(&format!("/computers/{c}/code/projects"), json!({ "name": "site" })).await;
-    let t = s.post(&format!("/computers/{c}/code/tasks"), json!({ "project": "Projects/site", "prompt": "Make the heading say \"Fresh bread\"" })).await;
+    let t = s
+        .post(
+            &format!("/computers/{c}/code/tasks"),
+            json!({ "project": "Projects/site", "prompt": "Make the heading say \"Fresh bread\"" }),
+        )
+        .await;
     let run = t["run_id"].as_str().unwrap().to_string();
-    let r = s.wait_for(&format!("/runs/{run}"), "the approval request", |v| v["approvals"].as_array().is_some_and(|a| !a.is_empty())).await;
+    let r = s
+        .wait_for(&format!("/runs/{run}"), "the approval request", |v| {
+            v["approvals"].as_array().is_some_and(|a| !a.is_empty())
+        })
+        .await;
     let req = r["approvals"][0]["request_id"].as_str().unwrap();
     assert_eq!(r["approvals"][0]["command"], "ls -la");
     let home = s.get("/home").await;
@@ -179,6 +226,9 @@ async fn an_agent_task_asks_before_running_and_its_changes_are_reviewed() {
     s.post(&format!("/runs/{run}/review"), json!({ "path": "index.html", "decision": "keep" })).await;
     s.post(&format!("/runs/{run}/review"), json!({ "path": "CHANGELOG.md", "decision": "undo" })).await;
     let list = s.get(&format!("/computers/{c}/files?path=Projects/site")).await;
-    assert!(!list["entries"].as_array().unwrap().iter().any(|e| e["name"] == "CHANGELOG.md"), "undoing a created file removes it");
+    assert!(
+        !list["entries"].as_array().unwrap().iter().any(|e| e["name"] == "CHANGELOG.md"),
+        "undoing a created file removes it"
+    );
     tokio::time::sleep(Duration::from_millis(50)).await;
 }

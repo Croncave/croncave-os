@@ -20,7 +20,10 @@ pub async fn fresh_database() -> String {
     let name = format!("cc_test_{}", Uuid::new_v4().simple());
     let admin = replace_db(&base, "postgres");
     let mut conn = sqlx::PgConnection::connect(&admin).await.expect("connect to Postgres");
-    sqlx::query(sqlx::AssertSqlSafe(format!("create database {name}"))).execute(&mut conn).await.expect("create test database");
+    sqlx::query(sqlx::AssertSqlSafe(format!("create database {name}")))
+        .execute(&mut conn)
+        .await
+        .expect("create test database");
     replace_db(&base, &name)
 }
 
@@ -125,7 +128,10 @@ impl Stack {
     }
 
     pub async fn wait_run(&self, run: &str) -> Value {
-        self.wait_for(&format!("/runs/{run}"), "the run to end", |v| v["ended_at"].is_string() && v["status"] != "running").await
+        self.wait_for(&format!("/runs/{run}"), "the run to end", |v| {
+            v["ended_at"].is_string() && v["status"] != "running"
+        })
+        .await
     }
 }
 
@@ -136,7 +142,9 @@ impl Drop for Stack {
         if let Ok(rd) = std::fs::read_dir(dir) {
             for e in rd.flatten() {
                 if let Ok(pid) = std::fs::read_to_string(e.path().join("agent.pid")) {
-                    let _ = std::process::Command::new("kill").args(["-s", "KILL", "--", &format!("-{}", pid.trim())]).status();
+                    let _ = std::process::Command::new("kill")
+                        .args(["-s", "KILL", "--", &format!("-{}", pid.trim())])
+                        .status();
                 }
             }
         }

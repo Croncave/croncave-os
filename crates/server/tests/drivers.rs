@@ -27,7 +27,11 @@ async fn suite(driver: &dyn ComputeDriver, disk_of: impl Fn(&str) -> std::path::
     std::fs::write(disk_of(&r).join("root/kept.txt"), "still here").unwrap();
     driver.stop(&r).await.expect("stop");
     assert_eq!(driver.status(&r).await.unwrap(), DriverStatus::Stopped);
-    assert_eq!(std::fs::read_to_string(disk_of(&r).join("root/kept.txt")).unwrap(), "still here", "the disk is kept while asleep");
+    assert_eq!(
+        std::fs::read_to_string(disk_of(&r).join("root/kept.txt")).unwrap(),
+        "still here",
+        "the disk is kept while asleep"
+    );
 
     driver.start(&r, &spec, &boot).await.expect("start again");
     tokio::time::sleep(Duration::from_millis(200)).await;

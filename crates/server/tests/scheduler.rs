@@ -12,12 +12,14 @@ async fn seed_job(db: &sqlx::PgPool, schedule: &str, due: chrono::DateTime<Utc>)
     let account = Uuid::new_v4();
     let computer = Uuid::new_v4();
     let job = Uuid::new_v4();
-    sqlx::query("insert into accounts (id, name, catalog_version, plan, period_start) values ($1, 'a', $2, 'pro', now())")
-        .bind(account)
-        .bind(version)
-        .execute(db)
-        .await
-        .unwrap();
+    sqlx::query(
+        "insert into accounts (id, name, catalog_version, plan, period_start) values ($1, 'a', $2, 'pro', now())",
+    )
+    .bind(account)
+    .bind(version)
+    .execute(db)
+    .await
+    .unwrap();
     sqlx::query("insert into computers (id, account_id, name, size, cpu, memory_gb, disk_gb, state) values ($1, $2, 'c', 'small', 1, 1, 10, 'asleep')")
         .bind(computer)
         .bind(account)
@@ -40,7 +42,11 @@ async fn seed_job(db: &sqlx::PgPool, schedule: &str, due: chrono::DateTime<Utc>)
 }
 
 async fn runs_for(db: &sqlx::PgPool, job: Uuid) -> Vec<Option<chrono::DateTime<Utc>>> {
-    sqlx::query_scalar("select slot_at from runs where job_id = $1 order by slot_at").bind(job).fetch_all(db).await.unwrap()
+    sqlx::query_scalar("select slot_at from runs where job_id = $1 order by slot_at")
+        .bind(job)
+        .fetch_all(db)
+        .await
+        .unwrap()
 }
 
 #[tokio::test]
@@ -66,9 +72,15 @@ async fn each_slot_runs_once_across_racing_control_planes_and_a_restart() {
     assert_eq!(runs_for(&restarted.db, job).await.len(), 1, "a restart doesn't run the same slot again");
 
     // Ten minutes of missed slots run once, not ten times.
-    sqlx::query("update jobs set next_due_at = $2 where id = $1").bind(job).bind(Utc::now() - Duration::minutes(10)).execute(&restarted.db).await.unwrap();
+    sqlx::query("update jobs set next_due_at = $2 where id = $1")
+        .bind(job)
+        .bind(Utc::now() - Duration::minutes(10))
+        .execute(&restarted.db)
+        .await
+        .unwrap();
     croncave_server::jobs::schedule_due(&restarted).await.unwrap();
     assert_eq!(runs_for(&restarted.db, job).await.len(), 2);
-    let (next,): (chrono::DateTime<Utc>,) = sqlx::query_as("select next_due_at from jobs where id = $1").bind(job).fetch_one(&restarted.db).await.unwrap();
+    let (next,): (chrono::DateTime<Utc>,) =
+        sqlx::query_as("select next_due_at from jobs where id = $1").bind(job).fetch_one(&restarted.db).await.unwrap();
     assert!(next > Utc::now(), "the next slot is in the future");
 }
