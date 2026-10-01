@@ -58,7 +58,7 @@
 			<strong>What it costs.</strong>
 			<span class="mid">Awake: <span class="mono">{money(hourly(size))}</span> an hour. Asleep: nothing but storage, <span class="mono">${(catalog.disk_gb_month * (1 + catalog.markup)).toFixed(4)}</span> per GB stored a month. A check that runs every hour costs pennies a month.</span>
 		</div>
-		<Field label="Starting apps" help="Files is always there.">
+		<Field group label="Starting apps" help="Files is always there.">
 			<div class="row">
 				<label class="row"><input type="checkbox" bind:checked={apps.scripts} /> Scripts</label>
 				<label class="row"><input type="checkbox" bind:checked={apps.watcher} /> Watcher</label>

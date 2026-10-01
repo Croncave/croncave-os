@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { get, post, api, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { session } from '$lib/session.svelte';
 	import { keepAwake } from '$lib/presence';
 	import { ago } from '$lib/format';
@@ -29,7 +29,8 @@
 	let reviewing = $state(page.url.searchParams.get('review') ?? '');
 	let server = $state<Any>(null);
 	let command = $state('python3 -m http.server $PORT --bind 127.0.0.1');
-	let port = $state(5173);
+	// Not 5173: with the local driver, computers share this machine's ports with Croncave's own.
+	let port = $state(4321);
 	let preview = $state<{ url: string; origin: string } | null>(null);
 	let width = $state<'laptop' | 'phone'>('laptop');
 	let newName = $state('');
@@ -72,7 +73,7 @@
 		loadProject();
 	});
 	$effect(() =>
-		onLive(
+		onChange(
 			throttle(async () => {
 				await loadProject();
 				if (current) current = await get(`/runs/${current.id}`);
@@ -208,6 +209,9 @@
 						<div class="row">
 							{#if running}<Status status={server.listening ? 'awake' : 'waking'} word={server.listening ? 'Running' : 'Starting'} /><Button size="sm" onclick={stopServer}>Stop</Button>{:else}<Button variant="primary" onclick={startServer}>Start dev server</Button>{/if}
 						</div>
+						{#if !running && server?.status === 'failed'}
+							<div class="banner bad">The dev server stopped. <a href="/runs/{server.run_id}">See why</a></div>
+						{/if}
 						{#if running && server.listening}
 							<div class="row"><Button variant="primary" onclick={openPreview}>Open preview</Button><Button onclick={newTab}>Open in a new tab</Button></div>
 							<span class="low">Private to you: it opens on its own address and travels over your computer's own connection.</span>

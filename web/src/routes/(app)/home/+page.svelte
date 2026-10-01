@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { get, post, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { session, setComputer } from '$lib/session.svelte';
 	import { ago, appName, greeting, when } from '$lib/format';
 	import Status from '$lib/ui/Status.svelte';
@@ -22,7 +22,7 @@
 		void session.computerId;
 		load();
 	});
-	$effect(() => onLive(throttle(load, 400)));
+	$effect(() => onChange(throttle(load, 400)));
 
 	const apps = [
 		{ name: 'Files', href: '/files' },

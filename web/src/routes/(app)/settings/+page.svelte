@@ -39,7 +39,7 @@
 	<h1>Settings</h1>
 	<section class="card stack">
 		<h2>Profile</h2>
-		<Field label="Name"><div class="row" style="flex-wrap: nowrap"><input bind:value={name} aria-label="Name" /><Button onclick={() => save({ name })}>Save</Button></div></Field>
+		<Field group label="Name"><div class="row" style="flex-wrap: nowrap"><input bind:value={name} aria-label="Name" /><Button onclick={() => save({ name })}>Save</Button></div></Field>
 		<div class="low">{me?.user.email} · {me?.user.phone}</div>
 	</section>
 	<section class="card stack">

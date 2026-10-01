@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { get, post, patch, del, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { ago, when } from '$lib/format';
 	import type { Job, RunBrief } from '$lib/types';
 	import Status from '$lib/ui/Status.svelte';
@@ -28,7 +28,7 @@
 		void id;
 		load();
 	});
-	$effect(() => onLive(throttle(load, 400)));
+	$effect(() => onChange(throttle(load, 400)));
 
 	const runs = $derived((job?.runs ?? []).filter((r) => r.trigger !== 'test'));
 	const latest = $derived(runs.find((r) => r.ended_at && r.status === 'succeeded'));

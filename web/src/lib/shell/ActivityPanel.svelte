@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { get, post } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { session } from '$lib/session.svelte';
 	import { ago, appName } from '$lib/format';
 	import type { EventRow } from '$lib/types';
@@ -23,7 +23,7 @@
 		void showSystem;
 		load();
 	});
-	$effect(() => onLive(throttle(() => load(), 300)));
+	$effect(() => onChange(throttle(() => load(), 300)));
 
 	async function readAll() {
 		await post('/events/read', { all: true });

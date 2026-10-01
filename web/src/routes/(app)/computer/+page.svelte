@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { get, patch, post, del, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { refreshMe, session } from '$lib/session.svelte';
 	import { ago, bytes, money } from '$lib/format';
 	import Status from '$lib/ui/Status.svelte';
@@ -25,7 +25,7 @@
 		void session.computerId;
 		load();
 	});
-	$effect(() => onLive(throttle(load, 500)));
+	$effect(() => onChange(throttle(load, 500)));
 
 	async function save(body: Record<string, unknown>, done = 'Saved') {
 		try {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { get, post, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
-	import { refreshMe } from '$lib/session.svelte';
+	import { onChange, throttle } from '$lib/live';
+	import { refreshMe, session } from '$lib/session.svelte';
 	import { dollars, money, when } from '$lib/format';
 	import Button from '$lib/ui/Button.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
@@ -30,7 +30,7 @@
 	$effect(() => {
 		load();
 	});
-	$effect(() => onLive(throttle(load, 800)));
+	$effect(() => onChange(throttle(load, 800)));
 
 	async function saveCap() {
 		try {
@@ -70,7 +70,8 @@
 		}
 	}
 	const pct = (n: number, d: number) => Math.min(100, d > 0 ? (n / d) * 100 : 0);
-	const daysLeft = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000));
+	// Days left by the platform's clock (which Dev tools can move forward).
+	const daysLeft = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - new Date(session.me?.now ?? Date.now()).getTime()) / 86400000));
 </script>
 
 <div class="page">

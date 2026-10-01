@@ -1,13 +1,23 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	let { label, help, children }: { label: string; help?: string; children: Snippet } = $props();
+	// `group` is for fields holding several controls (radios, a row of inputs): a labelled
+	// group instead of a <label>, so each control keeps its own name.
+	let { label, help, group = false, children }: { label: string; help?: string; group?: boolean; children: Snippet } = $props();
 </script>
 
-<label class="field">
-	<span class="name">{label}</span>
-	{@render children()}
-	{#if help}<span class="help">{help}</span>{/if}
-</label>
+{#if group}
+	<div class="field" role="group" aria-label={label}>
+		<span class="name">{label}</span>
+		{@render children()}
+		{#if help}<span class="help">{help}</span>{/if}
+	</div>
+{:else}
+	<label class="field">
+		<span class="name">{label}</span>
+		{@render children()}
+		{#if help}<span class="help">{help}</span>{/if}
+	</label>
+{/if}
 
 <style>
 	.field {

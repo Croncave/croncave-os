@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { get } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { session } from '$lib/session.svelte';
 	import { ago, when } from '$lib/format';
 	import type { Job } from '$lib/types';
@@ -16,7 +16,7 @@
 		void session.computerId;
 		load();
 	});
-	$effect(() => onLive(throttle(load, 500)));
+	$effect(() => onChange(throttle(load, 500)));
 	const stateOf = (j: Job) => (j.status === 'paused' ? 'paused' : j.last_run?.data?.couldnt_check ? 'couldnt_check' : (j.last_run?.status ?? 'asleep'));
 </script>
 

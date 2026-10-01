@@ -7,7 +7,7 @@
 	import ActivityPanel from '$lib/shell/ActivityPanel.svelte';
 	import AssistantPanel from '$lib/shell/AssistantPanel.svelte';
 	import { refreshMe, session } from '$lib/session.svelte';
-	import { connectLive, onLive, throttle } from '$lib/live';
+	import { connectLive, onChange, throttle } from '$lib/live';
 
 	let { children } = $props();
 	let ready = $state(false);
@@ -23,7 +23,7 @@
 			})
 			.catch(() => goto('/signin'));
 		// The top bar (computer state, usage left, unread count) follows what happens.
-		return onLive(
+		return onChange(
 			throttle(() => {
 				refreshMe().catch(() => {});
 			}, 500)

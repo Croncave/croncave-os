@@ -138,7 +138,7 @@
 					{/if}
 				</Field>
 			{/each}
-			<Field label="When to check"><SchedulePicker bind:trigger bind:schedule bind:watchPath {minSecs} /></Field>
+			<Field group label="When to check"><SchedulePicker bind:trigger bind:schedule bind:watchPath {minSecs} /></Field>
 			<div class="pane" data-testid="plain-words"><span class="label">In plain words</span><p>{rule}</p>{#each problems as p (p)}<p class="error">{p}</p>{/each}</div>
 			{#if error}<div class="banner bad">{error}{#if error.includes('plan')} <a href="/plans">See plans</a>{/if}</div>{/if}
 			<div class="row">

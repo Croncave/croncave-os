@@ -29,6 +29,13 @@ export function onLive(fn: Listener): () => void {
 	return () => listeners.delete(fn);
 }
 
+/** Subscribe to changes worth reloading a page for (not every output line). */
+export function onChange(fn: () => void): () => void {
+	return onLive((m) => {
+		if (m.kind !== 'output' && m.kind !== 'progress') fn();
+	});
+}
+
 /** Call `fn` at most once per `ms` while messages keep arriving. */
 export function throttle(fn: () => void, ms = 400): () => void {
 	let timer: ReturnType<typeof setTimeout> | null = null;

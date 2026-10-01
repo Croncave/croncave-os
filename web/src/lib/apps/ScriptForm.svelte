@@ -98,16 +98,16 @@
 		</div>
 	{/if}
 	<Field label="Name"><input bind:value={name} placeholder="Nightly report" aria-label="Job name" /></Field>
-	<Field label="Script" help="Python (.py), Node.js (.js) or shell (.sh). Packages in requirements.txt or package.json next to it are installed for you.">
+	<Field group label="Script" help="Python (.py), Node.js (.js) or shell (.sh). Packages in requirements.txt or package.json next to it are installed for you.">
 		<div class="row" style="flex-wrap: nowrap"><input bind:value={path} placeholder="Scripts/report.py" class="mono" aria-label="Script path" /><Button onclick={() => (picking = true)}>Choose…</Button></div>
 	</Field>
 	<div class="grid2">
 		<Field label="Runs with"><select bind:value={runtime}><option value="">Decide from the file name</option><option value="python">Python</option><option value="node">Node.js</option><option value="shell">Shell</option></select></Field>
 		<Field label="Arguments (optional)"><input bind:value={args} class="mono" /></Field>
 	</div>
-	<Field label="When it runs"><SchedulePicker bind:trigger bind:schedule bind:watchPath {minSecs} /></Field>
+	<Field group label="When it runs"><SchedulePicker bind:trigger bind:schedule bind:watchPath {minSecs} /></Field>
 	<JobLimits bind:maxRuntime bind:retries bind:overlap bind:notifyFinished bind:notifyFailed />
-	<Field label="Secrets" help={`Given to the script as environment variables and hidden in its output.${job?.secret_names.length ? ` Saved: ${job.secret_names.join(', ')}.` : ''}`}>
+	<Field group label="Secrets" help={`Given to the script as environment variables and hidden in its output.${job?.secret_names.length ? ` Saved: ${job.secret_names.join(', ')}.` : ''}`}>
 		{#each secrets as s, i (i)}
 			<div class="row" style="flex-wrap: nowrap"><input bind:value={s.name} placeholder="API_KEY" class="mono" aria-label="Secret name" /><input bind:value={s.value} type="password" placeholder="value" aria-label="Secret value" /></div>
 		{/each}

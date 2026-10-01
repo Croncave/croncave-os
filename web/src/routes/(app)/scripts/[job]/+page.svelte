@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { get, post, patch, del, message } from '$lib/api';
-	import { onLive, throttle } from '$lib/live';
+	import { onChange, throttle } from '$lib/live';
 	import { when } from '$lib/format';
 	import type { Job } from '$lib/types';
 	import Status from '$lib/ui/Status.svelte';
@@ -23,7 +23,7 @@
 		void id;
 		load();
 	});
-	$effect(() => onLive(throttle(load, 400)));
+	$effect(() => onChange(throttle(load, 400)));
 
 	async function runNow() {
 		try {

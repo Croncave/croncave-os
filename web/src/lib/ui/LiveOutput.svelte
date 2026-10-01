@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from '$lib/api';
 	import { onLive } from '$lib/live';
 
@@ -8,24 +9,36 @@
 	let box: HTMLDivElement | undefined = $state();
 	let follow = $state(true);
 
+	// Subscribe once per run. Everything inside is untracked, so updating `lines` never
+	// re-runs this effect (reading `lines` here would make it loop).
 	$effect(() => {
-		lines = [...initial];
 		const id = runId;
-		const last = () => lines.at(-1)?.id ?? 0;
-		const catchUp = async () => {
-			const r = await get(`/runs/${id}/output?after=${last()}`);
-			lines = [...lines, ...r.output];
-		};
-		const off = onLive((m) => {
-			if (m.kind === 'output' && m.id === id) {
-				const d = m.data as { id: number; stream: string; text: string };
-				if (d.id && d.id <= last()) return;
-				if (d.id && d.id > last() + 1 && last() !== 0) catchUp();
-				else lines = [...lines, d];
-			} else if (m.kind === 'resync') catchUp();
+		return untrack(() => {
+			lines = [...initial];
+			const last = () => lines.at(-1)?.id ?? 0;
+			let fetching = false;
+			const catchUp = async () => {
+				if (fetching) return;
+				fetching = true;
+				try {
+					const r = await get(`/runs/${id}/output?after=${last()}`);
+					const seen = new Set(lines.map((l) => l.id));
+					lines = [...lines, ...r.output.filter((l: { id: number }) => !seen.has(l.id))];
+				} finally {
+					fetching = false;
+				}
+			};
+			const off = onLive((m) => {
+				if (m.kind === 'output' && m.id === id) {
+					const d = m.data as { id: number; stream: string; text: string };
+					// Ids are shared by every run's output, so only order matters here.
+					if (d.id && d.id <= last()) return;
+					lines = [...lines, d];
+				} else if (m.kind === 'resync') catchUp();
+			});
+			if (!initial.length) catchUp();
+			return off;
 		});
-		if (!initial.length) catchUp();
-		return off;
 	});
 
 	$effect(() => {
