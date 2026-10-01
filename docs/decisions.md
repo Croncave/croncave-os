@@ -3,6 +3,45 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Light-mode "needs you" is #9a5b00, not #c2410c
+
+**Decision.** The scheme check (text 4.5:1, controls 3:1, statuses distinguishable) runs as a unit test on every
+scheme. It found the design's light "needs you" orange (#c2410c) only ΔE 16 from "failed" red (#b91c1c), too close
+to tell apart at a glance. Light "needs you" is now a deep amber, #9a5b00: ΔE 41 from "failed", and 4.8:1 or better on
+every light surface. Dark mode is unchanged. `docs/design.md` notes the change.
+
+**Why.** The architecture requires status colors that are "distinguishable from each other". Statuses always carry a
+word too, but "needs you" and "failed" are the two a person must never confuse.
+
+**Alternatives.** Keep the orange and rely on the word (fails the scheme's own check). Change "failed" instead (red
+is the stronger convention). Measure distance in RGB (doesn't match perception; ΔE in CIE Lab does).
+
+## 2026-10-01: Only screens that read the computer wake it
+
+**Decision.** Files, Code and previews read the computer itself, so opening them wakes it and keeps it awake while
+they're visible (the page reports presence every 15 seconds; presence lapses 40 seconds after the last report).
+Home, Activity, Scripts and Watcher show results the control plane already stored, so opening them lets a sleeping
+computer sleep.
+
+**Why.** "A computer is awake only while work runs or someone is looking." Looking at last night's watch results
+doesn't need the computer, and waking it would cost money for nothing.
+
+**Alternatives.** Wake on opening any app (what the architecture literally lists; wasteful for result screens).
+Never wake for viewing (Files couldn't work).
+
+## 2026-10-01: The web app is a client-rendered SvelteKit app; the theme is applied by the server hook
+
+**Decision.** SvelteKit runs with `ssr = false`: the server serves the shell, and the browser talks only to `/api`
+(proxied to the control plane in development, the edge's job in production). The server hook injects the scheme's
+CSS custom properties and the person's mode (from a cookie) into the HTML, so the first paint is already themed.
+Schemes come from the control plane as data, with the bundled scheme as a fallback.
+
+**Why.** Every screen is behind sign-in and live, so server rendering adds cookie forwarding and double data loading
+for no gain, while the theme still has to be right before first paint.
+
+**Alternatives.** Full SSR (more moving parts). A static SPA with an inline script reading localStorage (works, but the
+scheme would have to be duplicated into the HTML template).
+
 ## 2026-10-01: Run the relay and the preview edge inside the control plane process (prototype)
 
 **Decision.** One `croncave-server` binary serves the API, the relay (`/relay/*`) and the preview edge (its own port).

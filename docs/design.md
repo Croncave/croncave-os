@@ -26,7 +26,7 @@ Dark by default, with light and "match system". Croncave dark tokens:
 | accent-ink | #b5e35c | #3f6212 | Links, "live" status |
 | accent-soft | #1c2708 | #ecfccb | Soft accent fill |
 | working | #7aa7ff | #1d4ed8 | "Working" status |
-| needs | #fb923c | #c2410c | "Needs you" status |
+| needs | #fb923c | #9a5b00 | "Needs you" status (light changed 2026-10-01, see decisions) |
 | failed | #f87171 | #b91c1c | "Failed" status |
 | asleep | #a1a1aa | #52525b | "Asleep" status |
 

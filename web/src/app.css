@@ -1,0 +1,210 @@
+/* Croncave: every color is a semantic token from the scheme (see lib/theme). */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: Inter, system-ui, sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+a {
+	color: var(--accent-ink);
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+h1,
+h2,
+h3 {
+	margin: 0;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+h1 {
+	font-size: 22px;
+}
+h2 {
+	font-size: 16px;
+}
+h3 {
+	font-size: 14px;
+}
+p {
+	margin: 0;
+}
+.mono,
+code,
+kbd,
+pre {
+	font-family: 'JetBrains Mono', ui-monospace, monospace;
+	font-size: 12.5px;
+}
+.label {
+	font-family: 'JetBrains Mono', ui-monospace, monospace;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--low);
+}
+.mid {
+	color: var(--mid);
+}
+.low {
+	color: var(--low);
+}
+.page {
+	padding: 24px 28px 48px;
+	max-width: 1100px;
+	display: grid;
+	gap: 20px;
+	align-content: start;
+}
+.page-head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+.row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.stack {
+	display: grid;
+	gap: 12px;
+	align-content: start;
+}
+.grid2 {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 16px;
+}
+.card {
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	padding: 16px;
+}
+.pane {
+	background: var(--pane);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	padding: 12px;
+}
+.spacer {
+	flex: 1;
+}
+input,
+select,
+textarea {
+	font: inherit;
+	color: var(--ink);
+	background: var(--pane);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	padding: 8px 10px;
+	width: 100%;
+}
+textarea {
+	resize: vertical;
+}
+input[type='checkbox'],
+input[type='radio'] {
+	width: auto;
+	accent-color: var(--accent);
+}
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+table {
+	width: 100%;
+	border-collapse: collapse;
+}
+th {
+	text-align: left;
+	font-weight: 500;
+	color: var(--low);
+	font-size: 12px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line);
+}
+td {
+	padding: 8px;
+	border-bottom: 1px solid var(--line);
+	vertical-align: top;
+}
+tr.click {
+	cursor: pointer;
+}
+tr.click:hover td {
+	background: var(--pane);
+}
+.error {
+	color: var(--failed);
+}
+.banner {
+	border: 1px solid var(--line);
+	border-left: 3px solid var(--needs);
+	background: var(--surface);
+	border-radius: 10px;
+	padding: 12px 14px;
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.banner.good {
+	border-left-color: var(--live);
+}
+.banner.bad {
+	border-left-color: var(--failed);
+}
+.list {
+	display: grid;
+	align-content: start;
+}
+.list > * {
+	padding: 10px 2px;
+	border-bottom: 1px solid var(--line);
+}
+.list > *:last-child {
+	border-bottom: 0;
+}
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--line);
+	background: var(--pane);
+	font-size: 12px;
+	color: var(--mid);
+}
+.muted-box {
+	color: var(--mid);
+	background: var(--pane);
+	border: 1px dashed var(--line);
+	border-radius: 10px;
+	padding: 20px;
+	text-align: center;
+}
+.pad { min-width: 0; }

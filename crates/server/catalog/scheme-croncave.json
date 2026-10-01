@@ -17,7 +17,7 @@
     "focus":       { "dark": "#b5e35c", "light": "#3f6212" },
     "live":        { "dark": "#b5e35c", "light": "#3f6212" },
     "working":     { "dark": "#7aa7ff", "light": "#1d4ed8" },
-    "needs":       { "dark": "#fb923c", "light": "#c2410c" },
+    "needs":       { "dark": "#fb923c", "light": "#9a5b00" },
     "failed":      { "dark": "#f87171", "light": "#b91c1c" },
     "asleep":      { "dark": "#a1a1aa", "light": "#52525b" },
     "chart-1":     { "dark": "#99d52a", "light": "#4d7c0f" },

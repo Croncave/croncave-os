@@ -1,0 +1,72 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import TopBar from '$lib/shell/TopBar.svelte';
+	import Dock from '$lib/shell/Dock.svelte';
+	import ActivityPanel from '$lib/shell/ActivityPanel.svelte';
+	import AssistantPanel from '$lib/shell/AssistantPanel.svelte';
+	import { refreshMe, session } from '$lib/session.svelte';
+	import { connectLive, onLive, throttle } from '$lib/live';
+
+	let { children } = $props();
+	let ready = $state(false);
+
+	onMount(() => {
+		refreshMe()
+			.then((me) => {
+				if (me.signup_step !== 'done') return goto('/signup');
+				const free = ['/computers/new', '/plans', '/settings', '/usage', '/admin'];
+				if (!me.computers.length && !free.some((p) => page.url.pathname.startsWith(p))) return goto('/computers/new');
+				ready = true;
+				connectLive();
+			})
+			.catch(() => goto('/signin'));
+		// The top bar (computer state, usage left, unread count) follows what happens.
+		return onLive(
+			throttle(() => {
+				refreshMe().catch(() => {});
+			}, 500)
+		);
+	});
+</script>
+
+{#if ready && session.me}
+	<div class="shell">
+		<TopBar />
+		<div class="body">
+			<Dock />
+			<main class="main">
+				{#if session.me.account.paused_at && !page.url.pathname.startsWith('/plans')}
+					<div class="banner paused" data-testid="paused-banner">
+						<strong>Work is paused at your spending cap.</strong>
+						<span class="mid">Computers finish what they're doing and sleep. Nothing is deleted.</span>
+						<span class="spacer"></span><a href="/plans">Raise the cap</a>
+					</div>
+				{/if}
+				{@render children()}
+			</main>
+		</div>
+		{#if session.activityOpen}<ActivityPanel />{/if}
+		{#if session.assistantOpen && session.me.account.ai_enabled}<AssistantPanel />{/if}
+	</div>
+{/if}
+
+<style>
+	.shell {
+		min-height: 100vh;
+		display: grid;
+		grid-template-rows: auto 1fr;
+	}
+	.body {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		min-height: calc(100vh - 52px);
+	}
+	.main {
+		min-width: 0;
+	}
+	.paused {
+		margin: 16px 28px 0;
+	}
+</style>
