@@ -24,6 +24,10 @@ ensure_env() {
   set +a
 }
 
+# Is something already listening on a local port? Uses bash's /dev/tcp, so it needs no
+# lsof or ss (neither is guaranteed on a Mac or a slim CI image).
+port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
 find_pg_bin() {
   if command -v pg_ctl >/dev/null 2>&1; then dirname "$(command -v pg_ctl)"; return; fi
   for d in /usr/lib/postgresql/*/bin /opt/homebrew/opt/postgresql@*/bin /usr/local/opt/postgresql@*/bin \

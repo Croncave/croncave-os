@@ -72,6 +72,15 @@ if [ "${COMPUTE_DRIVER:-local}" = "docker" ]; then
   say "Computers run as Docker containers from ${COMPUTER_IMAGE:-croncave-computer:dev}"
 fi
 
+# Say which port is taken, rather than letting whatever binds first print a stack trace.
+# The usual cause is an older dev.sh, or a second checkout, still running.
+for addr in "${WEB_PORT:-5173}" "${API_ADDR:-127.0.0.1:8080}" "${PREVIEW_ADDR:-127.0.0.1:8081}"; do
+  port="${addr##*:}"
+  if port_busy "$port"; then
+    die "Port $port is already in use. Stop what is using it (likely another ./scripts/dev.sh, or a second checkout) and try again."
+  fi
+done
+
 say "Building the control plane and the agent"
 cargo build --quiet -p croncave-server -p croncave-agent
 
@@ -97,11 +106,15 @@ start_server() {
   return 1
 }
 
+# Run Vite through its own shim, not `pnpm exec`: pnpm's launcher starts the real
+# process in a new process group, so $WEBPID would be a wrapper and killing it would
+# leave Vite holding the web port. The shim execs node, so $WEBPID *is* Vite.
+VITE=node_modules/.bin/vite
 start_web() {
   if [ "$MODE" = "e2e" ]; then
-    (cd web && pnpm run build >/dev/null && exec pnpm exec vite preview --strictPort) &
+    (cd web && pnpm run build >/dev/null && exec "$VITE" preview --strictPort) &
   else
-    (cd web && exec pnpm exec vite dev) &
+    (cd web && exec "$VITE" dev) &
   fi
   WEBPID=$!
 }
