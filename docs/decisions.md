@@ -8,7 +8,9 @@ considered. When experience contradicts a decision, add a dated amendment instea
 **Decision.** `web/package.json` and `e2e/package.json` carry `"packageManager": "pnpm@12.6.0"`, and both
 lockfiles are resolved under pnpm 12's default `minimumReleaseAge` (a package must be a day old). Where a
 dependency's floor demanded a version younger than that — `vitest` was pinned `^5.0.3`, and 5.0.3 was hours old —
-the floor is lowered (`^5.0.0`, which resolves 5.0.2) rather than excluded from the policy.
+the floor is lowered (`^5.0.0`, which resolves 5.0.2) rather than excluded from the policy. The root
+`package.json` carries the same pin, and CI's `pnpm/action-setup` reads it instead of naming a version, so the
+workflow holds no version of its own. The three pins must match when pnpm is upgraded.
 
 **Why.** The lockfiles were resolved with pnpm 10.28, which had no release-age policy, so `pnpm install
 --frozen-lockfile` failed outright on a machine with pnpm 12 (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`). The policy
