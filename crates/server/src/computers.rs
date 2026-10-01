@@ -93,6 +93,10 @@ pub struct NewComputer {
     pub disk_gb: Option<i32>,
     #[serde(default)]
     pub apps: Option<Vec<String>>,
+    #[serde(default)]
+    pub sleep_delay_secs: Option<i32>,
+    #[serde(default)]
+    pub wake_for_schedule: Option<bool>,
 }
 
 pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewComputer>) -> ApiResult<Json<Value>> {
@@ -120,6 +124,10 @@ pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewCo
         )));
     }
     let disk_gb = b.disk_gb.unwrap_or(size.disk_gb).clamp(5, size.disk_gb * 4);
+    let sleep_delay = b.sleep_delay_secs.unwrap_or(30);
+    if !(30..=86_400).contains(&sleep_delay) {
+        return Err(ApiError::bad("Choose a sleep delay between 30 seconds and a day."));
+    }
     let id = Uuid::new_v4();
     let spec = ComputerSpec { id, cpu: size.cpu, memory_gb: size.memory_gb, disk_gb };
     let compute_ref = app
@@ -130,8 +138,9 @@ pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewCo
         .map_err(|e| ApiError::unavailable(format!("Couldn't create the computer: {e}")))?;
     let mut tx = app.db.begin().await?;
     sqlx::query(
-        "insert into computers (id, account_id, name, size, cpu, memory_gb, disk_gb, state, compute_ref, wake_requested_at, wake_cause, time_zone)
-         values ($1, $2, $3, $4, $5, $6, $7, 'asleep', $8, $9, 'created', $10)",
+        "insert into computers (id, account_id, name, size, cpu, memory_gb, disk_gb, state, compute_ref, wake_requested_at, wake_cause, time_zone,
+                                sleep_delay_secs, wake_for_schedule)
+         values ($1, $2, $3, $4, $5, $6, $7, 'asleep', $8, $9, 'created', $10, $11, $12)",
     )
     .bind(id)
     .bind(auth.account.id)
@@ -143,6 +152,8 @@ pub async fn create(State(app): State<AppState>, auth: Auth, Json(b): Json<NewCo
     .bind(&compute_ref)
     .bind(app.now())
     .bind(&auth.user.time_zone)
+    .bind(sleep_delay)
+    .bind(b.wake_for_schedule.unwrap_or(true))
     .execute(&mut *tx)
     .await?;
     let apps = b.apps.unwrap_or_else(|| APPS.iter().map(|s| s.to_string()).collect());
@@ -211,6 +222,8 @@ pub struct UpdateComputer {
     pub keep_awake: Option<bool>,
     pub size: Option<String>,
     pub disk_gb: Option<i32>,
+    pub wake_for_schedule: Option<bool>,
+    pub time_zone: Option<String>,
 }
 
 pub async fn update(
@@ -238,6 +251,38 @@ pub async fn update(
             .bind(d)
             .execute(&mut *tx)
             .await?;
+    }
+    if let Some(w) = b.wake_for_schedule {
+        sqlx::query("update computers set wake_for_schedule = $2 where id = $1")
+            .bind(id)
+            .bind(w)
+            .execute(&mut *tx)
+            .await?;
+    }
+    if let Some(z) = &b.time_zone {
+        if crate::zones::find(z).is_none() {
+            return Err(ApiError::bad("Choose one of the US time zones."));
+        }
+        // The computer's jobs follow it, and their next runs move to the new zone's clock.
+        sqlx::query("update computers set time_zone = $2 where id = $1").bind(id).bind(z).execute(&mut *tx).await?;
+        let jobs: Vec<(Uuid, Option<String>, String)> =
+            sqlx::query_as("select id, schedule, status from jobs where computer_id = $1 and status <> 'deleted'")
+                .bind(id)
+                .fetch_all(&mut *tx)
+                .await?;
+        for (job, schedule, status) in jobs {
+            let next = if status == "active" {
+                schedule.as_deref().and_then(|s| crate::jobs::next_after(s, z, app.now()))
+            } else {
+                None
+            };
+            sqlx::query("update jobs set time_zone = $2, next_due_at = $3 where id = $1")
+                .bind(job)
+                .bind(z)
+                .bind(next)
+                .execute(&mut *tx)
+                .await?;
+        }
     }
     if let Some(k) = b.keep_awake {
         if k {

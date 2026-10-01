@@ -84,6 +84,14 @@ impl Stack {
         v
     }
 
+    pub async fn patch(&self, path: &str, body: Value) -> Value {
+        let r = self.client.patch(format!("{}/api{path}", self.base)).json(&body).send().await.expect("request");
+        let status = r.status();
+        let v: Value = r.json().await.unwrap_or(Value::Null);
+        assert!(status.is_success(), "PATCH {path} -> {status}: {v}");
+        v
+    }
+
     pub async fn put_bytes(&self, path: &str, body: Vec<u8>) -> Value {
         let r = self.client.put(format!("{}/api{path}", self.base)).body(body).send().await.expect("request");
         let status = r.status();

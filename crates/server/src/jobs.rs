@@ -480,6 +480,16 @@ pub async fn dispatch(app: &AppState) -> anyhow::Result<()> {
             send_start(app, &run, &job).await?;
             continue;
         }
+        if !computer.wake_for_schedule && matches!(run.trigger.as_str(), "schedule" | "files") {
+            set_status(
+                app,
+                &run,
+                "waiting",
+                Some("Waiting until the computer is awake (it doesn't wake for scheduled work)"),
+            )
+            .await?;
+            continue;
+        }
         match crate::computers::request_wake(app, &computer, &format!("run:{}", job.name)).await {
             Ok(()) => set_status(app, &run, "waiting", Some("Waking your computer")).await?,
             Err(e) => set_status(app, &run, "waiting", Some(&e.message)).await?,

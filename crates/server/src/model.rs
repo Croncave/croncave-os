@@ -80,6 +80,7 @@ pub struct Computer {
     pub note: Option<String>,
     pub created_at: DateTime<Utc>,
     pub time_zone: String,
+    pub wake_for_schedule: bool,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
