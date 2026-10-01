@@ -6,9 +6,11 @@ provider are mocks behind their real interfaces, so no accounts are needed.
 ## What you need
 
 - **Rust** (stable, 1.88 or newer): `curl https://sh.rustup.rs -sSf | sh`
-- **Node.js 22** and **pnpm 10**: `corepack enable` (or `npm i -g pnpm`)
-- **Postgres 16** binaries (`brew install postgresql@16` on a Mac, `apt install postgresql-16` on Ubuntu), or a
-  running Docker. You don't start Postgres yourself; the script runs a private one in `.dev/postgres`.
+- **Node.js 22 or newer** and **pnpm**: `corepack enable` picks up the pinned version
+  (`packageManager` in `package.json`), so you don't choose one.
+- **Postgres 16 or newer** binaries (`brew install postgresql@17` on a Mac, `apt install postgresql-16` on
+  Ubuntu), or a running Docker. You don't start Postgres yourself; the script runs a private one in
+  `.dev/postgres`.
 - **Python 3** (scripts and the demo dev server run with it) and optionally Node.js for Node scripts.
 
 ## Start it
