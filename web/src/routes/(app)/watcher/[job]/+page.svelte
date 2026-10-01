@@ -7,7 +7,6 @@
 	import type { Job, RunBrief } from '$lib/types';
 	import Status from '$lib/ui/Status.svelte';
 	import Button from '$lib/ui/Button.svelte';
-	import Chart from '$lib/ui/Chart.svelte';
 	import RunList from '$lib/ui/RunList.svelte';
 	import Modal from '$lib/ui/Modal.svelte';
 	import SchedulePicker from '$lib/ui/SchedulePicker.svelte';
@@ -85,13 +84,10 @@
 				{#each [...runs].reverse() as r (r.id)}<a href="/runs/{r.id}" class="d {kind(r)}" title="{r.headline ?? r.status} · {ago(r.ended_at ?? r.queued_at)}"></a>{/each}
 			</div>
 			<div class="row low small"><span class="d match"></span>found something <span class="d same"></span>no change <span class="d couldnt"></span>couldn't check</div>
-			{#if latest?.data?.couldnt_check === undefined && runs[0]?.data?.couldnt_check}
+			{#if runs[0]?.data?.couldnt_check}
 				<div class="banner bad"><Status status="couldnt_check" /><span>{runs[0].error_plain}</span></div>
 			{/if}
 		</section>
-		{#if latest?.data?.detail?.history}
-			<section class="card stack"><h2>{job.setup.inputs.symbol} price</h2><Chart points={latest.data.detail.history.map((h: [number, number]) => ({ x: h[0], y: h[1] }))} threshold={latest.data.detail.limit} /></section>
-		{/if}
 		{#if latest?.data?.detail}
 			<section class="card stack"><h2>Latest check</h2><p class="mid">{latest.headline} · {ago(latest.ended_at)}</p><WatchDetail data={latest.data.detail} /></section>
 		{/if}
