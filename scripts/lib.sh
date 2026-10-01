@@ -50,7 +50,10 @@ ensure_postgres() {
   if [ -n "${DATABASE_URL:-}" ] && psql "$DATABASE_URL" -c 'select 1' >/dev/null 2>&1; then
     return
   fi
-  local url="postgres://croncave@127.0.0.1:$PG_PORT/$db"
+  local url="postgres://croncave@127.0.0.1:$PG_PORT/$db" pg_bin
+  # Homebrew's versioned Postgres isn't on PATH; its psql and pg_isready are needed too.
+  pg_bin="$(find_pg_bin)"
+  [ -n "$pg_bin" ] && PATH="$pg_bin:$PATH"
   if ! pg_isready -h 127.0.0.1 -p "$PG_PORT" >/dev/null 2>&1; then
     local bin
     bin="$(find_pg_bin)"
@@ -63,7 +66,8 @@ ensure_postgres() {
         [ "$(id -u)" = "0" ] && chown -R postgres "$data"
         as_pg "$bin/initdb" -D "$data" -U croncave --auth=trust -E UTF8 >/dev/null
       fi
-      [ "$(id -u)" = "0" ] && { mkdir -p "$DEV_DIR/pgsock"; chown postgres "$DEV_DIR/pgsock" "$DEV_DIR"; }
+      mkdir -p "$DEV_DIR/pgsock"
+      [ "$(id -u)" = "0" ] && chown postgres "$DEV_DIR/pgsock" "$DEV_DIR"
       say "Starting Postgres on port $PG_PORT"
       as_pg "$bin/pg_ctl" -D "$data" -l "$data/server.log" -w \
         -o "-p $PG_PORT -c listen_addresses=127.0.0.1 -k $DEV_DIR/pgsock -c max_connections=200 -c fsync=off" start >/dev/null \
