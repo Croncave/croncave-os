@@ -1,0 +1,43 @@
+[package]
+name = "croncave-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = { version = "0.8.9", features = ["ws", "macros"] }
+base64 = "0.23.1"
+bytes = "1.12.1"
+chacha20poly1305 = "0.11.0"
+chrono = { version = "0.4.45", features = ["serde"] }
+cron = "0.17.0"
+croncave-proto = { version = "0.1.0", path = "../proto" }
+croncave-relay = { version = "0.1.0", path = "../relay" }
+dotenvy = "0.15.7"
+futures = "0.3.34"
+hex = "0.4.3"
+hmac = "0.13.0"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "cookies"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
+thiserror = "2.0.21"
+tokio = { version = "1.53.1", features = ["full"] }
+tokio-stream = "0.1.19"
+tokio-tungstenite = "0.30.0"
+tower-http = { version = "0.7.1", features = ["trace", "cors"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+uuid = { version = "1.26.1", features = ["v4", "serde"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+croncave-agent = { path = "../agent" }
+tempfile = "3.27.0"

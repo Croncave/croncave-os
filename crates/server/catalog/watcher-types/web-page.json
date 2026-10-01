@@ -1,0 +1,17 @@
+{
+  "id": "web-page",
+  "version": 1,
+  "name": "A web page",
+  "description": "Tell me when a page, or one part of it, changes.",
+  "inputs": [
+    { "key": "url", "label": "Page address", "kind": { "type": "url" }, "required": true,
+      "default": "http://127.0.0.1:8080/demo/page", "help": "The demo page changes when you press \"Change the demo page\" on the Dev tools page." },
+    { "key": "selector", "label": "Only this part of the page (optional)", "kind": { "type": "text" },
+      "help": "A CSS selector such as #hours. Leave empty to watch the whole page." }
+  ],
+  "source": { "type": "http", "url": "{url}" },
+  "extract": { "type": "text", "selector": "{selector}" },
+  "condition": { "type": "changed" },
+  "rule": "Check {url} and tell me when it changes",
+  "view": "text"
+}

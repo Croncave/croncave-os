@@ -1,0 +1,36 @@
+{
+  "id": "demo-listings",
+  "version": 1,
+  "name": "Apartment listings (demo site)",
+  "description": "Tell me about new apartments that match what I want. Reads the local demo listings site.",
+  "inputs": [
+    { "key": "url", "label": "Listings page", "kind": { "type": "url" }, "required": true, "default": "http://127.0.0.1:8080/demo/listings" },
+    { "key": "max_price", "label": "Most rent per month", "kind": { "type": "number" }, "default": "2200" },
+    { "key": "min_beds", "label": "Fewest bedrooms", "kind": { "type": "number" }, "default": "1" },
+    { "key": "area", "label": "Neighborhood contains", "kind": { "type": "text" } }
+  ],
+  "source": { "type": "http", "url": "{url}" },
+  "extract": {
+    "type": "items",
+    "item": ".listing",
+    "id_field": "id",
+    "fields": [
+      { "key": "id", "label": "Listing", "selector": "a.title", "attr": "data-id" },
+      { "key": "title", "label": "Title", "selector": "a.title" },
+      { "key": "link", "label": "Link", "selector": "a.title", "attr": "href" },
+      { "key": "price", "label": "Rent", "selector": ".price", "number": true },
+      { "key": "beds", "label": "Bedrooms", "selector": ".beds", "number": true },
+      { "key": "area", "label": "Neighborhood", "selector": ".area" }
+    ]
+  },
+  "condition": {
+    "type": "new_items",
+    "filters": [
+      { "field": "price", "op": "at_most", "value": "{max_price}" },
+      { "field": "beds", "op": "at_least", "value": "{min_beds}" },
+      { "field": "area", "op": "contains", "value": "{area}" }
+    ]
+  },
+  "rule": "Check {url} and tell me about new listings up to ${max_price} a month with at least {min_beds} bedrooms",
+  "view": "items"
+}

@@ -1,0 +1,43 @@
+{
+  "note": "Starting figures from docs/product.md (Pricing). Every figure here is a starting point to test in the alpha.",
+  "currency": "usd",
+  "markup": 0.25,
+  "disk_gb_month": 0.15,
+  "sizes": {
+    "small":  { "label": "Small",  "cpu": 1, "memory_gb": 1, "disk_gb": 10, "provider_hourly": 0.0060, "suits": "Monitoring, small scripts, file work" },
+    "medium": { "label": "Medium", "cpu": 2, "memory_gb": 4, "disk_gb": 20, "provider_hourly": 0.0300, "suits": "Most apps and one code agent at a time" },
+    "large":  { "label": "Large",  "cpu": 4, "memory_gb": 8, "disk_gb": 40, "provider_hourly": 0.0600, "suits": "Heavy builds and several agents in parallel" }
+  },
+  "ai_models": {
+    "mock-assistant": { "provider": "mock", "input_per_mtok": 3.0, "output_per_mtok": 15.0 }
+  },
+  "plans": {
+    "free": {
+      "name": "Free", "order": 0, "price_monthly": 0, "requires_card": false,
+      "award": 2, "allowance": 1, "computers": 1, "awake_at_once": 1, "largest_size": "small",
+      "min_schedule_secs": 3600, "keep_awake": 0, "overage": false, "history_days": 7,
+      "parallel_agents": 1, "support": "Help docs", "trial": { "plan": "plus", "days": 14 }
+    },
+    "plus": {
+      "name": "Plus", "order": 1, "price_monthly": 10, "requires_card": true,
+      "award": 5, "allowance": 3, "computers": 2, "awake_at_once": 1, "largest_size": "medium",
+      "min_schedule_secs": 300, "keep_awake": 0, "overage": true, "history_days": 30,
+      "parallel_agents": 1, "support": "Email", "trial": { "plan": "pro", "days": 7 }
+    },
+    "pro": {
+      "name": "Pro", "order": 2, "price_monthly": 25, "requires_card": true,
+      "award": 10, "allowance": 5, "computers": 5, "awake_at_once": 3, "largest_size": "large",
+      "min_schedule_secs": 60, "keep_awake": 1, "overage": true, "history_days": 30,
+      "parallel_agents": 1, "support": "Email", "trial": { "plan": "max", "days": 7 }
+    },
+    "max": {
+      "name": "Max", "order": 3, "price_monthly": 60, "requires_card": true,
+      "award": 25, "allowance": 15, "computers": 10, "awake_at_once": 8, "largest_size": "large",
+      "min_schedule_secs": 60, "keep_awake": 5, "overage": true, "history_days": 90,
+      "parallel_agents": 4, "support": "Priority email", "trial": null
+    }
+  },
+  "promos": [
+    { "code": "ALPHA5", "credit": 5, "ends_at": null, "note": "Alpha testers" }
+  ]
+}

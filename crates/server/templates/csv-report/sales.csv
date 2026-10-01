@@ -1,0 +1,11 @@
+date,region,product,amount
+2026-09-01,West,Notebook,12.50
+2026-09-01,East,Pen,3.25
+2026-09-02,West,Backpack,48.00
+2026-09-02,South,Notebook,12.50
+2026-09-03,East,Backpack,48.00
+2026-09-03,North,Stapler,9.75
+2026-09-04,West,Pen,3.25
+2026-09-04,South,Lamp,29.99
+2026-09-05,East,Lamp,29.99
+2026-09-05,North,Notebook,12.50

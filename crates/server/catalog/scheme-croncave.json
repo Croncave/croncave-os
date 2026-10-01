@@ -1,0 +1,29 @@
+{
+  "id": "croncave",
+  "name": "Croncave",
+  "version": 1,
+  "tokens": {
+    "bg":          { "dark": "#0b0b0d", "light": "#f7f7f8" },
+    "surface":     { "dark": "#131316", "light": "#ffffff" },
+    "pane":        { "dark": "#0e0e11", "light": "#f1f1f3" },
+    "line":        { "dark": "#26262c", "light": "#e4e4e7" },
+    "ink":         { "dark": "#ededf0", "light": "#111113" },
+    "mid":         { "dark": "#a1a1aa", "light": "#5b5b66" },
+    "low":         { "dark": "#85858f", "light": "#6b6b75" },
+    "accent":      { "dark": "#99d52a", "light": "#18181b" },
+    "on-accent":   { "dark": "#1a2e05", "light": "#ffffff" },
+    "accent-ink":  { "dark": "#b5e35c", "light": "#3f6212" },
+    "accent-soft": { "dark": "#1c2708", "light": "#ecfccb" },
+    "focus":       { "dark": "#b5e35c", "light": "#3f6212" },
+    "live":        { "dark": "#b5e35c", "light": "#3f6212" },
+    "working":     { "dark": "#7aa7ff", "light": "#1d4ed8" },
+    "needs":       { "dark": "#fb923c", "light": "#c2410c" },
+    "failed":      { "dark": "#f87171", "light": "#b91c1c" },
+    "asleep":      { "dark": "#a1a1aa", "light": "#52525b" },
+    "chart-1":     { "dark": "#99d52a", "light": "#4d7c0f" },
+    "chart-2":     { "dark": "#7aa7ff", "light": "#1d4ed8" },
+    "chart-3":     { "dark": "#fb923c", "light": "#c2410c" },
+    "chart-4":     { "dark": "#c4b5fd", "light": "#6d28d9" },
+    "overlay":     { "dark": "rgba(0,0,0,0.6)", "light": "rgba(17,17,19,0.35)" }
+  }
+}

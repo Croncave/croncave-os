@@ -1,0 +1,16 @@
+{
+  "id": "stock-price",
+  "version": 1,
+  "name": "A stock price (demo data)",
+  "description": "Tell me when a stock goes above or below a price. Prices come from the platform's market data (mocked in the prototype).",
+  "inputs": [
+    { "key": "symbol", "label": "Stock symbol", "kind": { "type": "text" }, "required": true, "default": "ACME" },
+    { "key": "direction", "label": "Tell me when it goes", "kind": { "type": "select", "options": ["below", "above"] }, "required": true, "default": "below" },
+    { "key": "target", "label": "Price", "kind": { "type": "number" }, "required": true, "default": "100" }
+  ],
+  "source": { "type": "platform", "call": "market.quote", "symbol": "{symbol}" },
+  "extract": { "type": "value", "pointer": "/price", "label": "{symbol}" },
+  "condition": { "type": "threshold", "direction": "{direction}", "value": "{target}" },
+  "rule": "Check {symbol} and tell me when it goes {direction} ${target}",
+  "view": "chart"
+}
