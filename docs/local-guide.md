@@ -20,6 +20,9 @@ provider are mocks behind their real interfaces, so no accounts are needed.
 The first run builds the Rust services and installs the web app's packages (a few minutes). Then open
 **http://localhost:5173**. Ctrl-C stops everything, computers included.
 
+Leave it running: when you `git pull` (or edit), the web app reloads in the browser and Rust changes rebuild and
+restart the control plane by themselves. Computers keep running through a restart. `--no-watch` turns this off.
+
 It creates `.env` from `.env.example` with fresh secrets. Every provider is chosen there (`COMPUTE_DRIVER=local`,
 `PAYMENTS=mock`, `NOTIFIER=outbox`, `AI=mock`, `MARKET_DATA=mock`). Ports: web 5173, API and relay 8080, previews 8081.
 
@@ -90,5 +93,19 @@ They start their own stack (`./scripts/dev.sh --e2e`, ports 15173/18080/18081, a
 - Computers in the local driver are processes in `.dev/data/computers/<id>/`; `disk/root` is the person's files.
   They share your machine's network, so give dev servers distinct ports (see `docs/decisions.md`).
 - To start over: stop the script, then `rm -rf .dev` (this deletes the local database too).
-- `COMPUTE_DRIVER=docker` runs computers as containers when a Docker daemon is available; `fly` says it isn't
-  configured until the real implementation exists.
+- `fly` (as `COMPUTE_DRIVER`) says it isn't configured until the real implementation exists.
+
+## Computers as Docker containers
+
+```sh
+./scripts/dev.sh --docker
+```
+
+With Docker running, this builds the computer image (`docker/computer.Dockerfile`; on a Mac the first build compiles
+the agent inside Docker and takes a few minutes) and runs each computer as a container: its own network, CPU and
+memory limits from its size, its disk mounted from `.dev/data/computers/<id>/disk`. Everything else works the same,
+and dev servers no longer share your machine's ports. `docker ps --filter label=croncave.computer` shows the awake
+ones. To run the browser tests this way: `cd e2e && E2E_DOCKER=1 pnpm test`.
+
+If your `.env` was made before this, it has an unused `DOCKER_IMAGE` line; the variable is now `COMPUTER_IMAGE`
+(see `.env.example`).

@@ -3,6 +3,48 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Docker computers boot a computer image and reach the relay over the bridge
+
+**Decision.** `COMPUTE_DRIVER=docker` (or `./scripts/dev.sh --docker`) runs each computer as a container from the
+computer image, `docker/computer.Dockerfile`: Debian with Python, Node.js, bash and `ps`, and the agent as its only
+service, behind `--init` so orphaned processes are reaped. The disk is a bind mount; a container is made at each wake
+and removed at sleep. CPU and memory limits come from the computer's size. Nothing is published: the agent dials
+`host.docker.internal`. On Linux that is the bridge gateway, so the control plane gets an extra listener there
+(`RELAY_ADDR`) that serves only the relay and the demo sites, never the API. Docker Desktop (macOS, Windows) already
+routes `host.docker.internal` to the host. Where computers reach the demo sites is configuration (`DEMO_URL`), and
+the built-in demo types (version 2) take their default address from it.
+
+The image has two ways to get the agent: built inside Docker (works from a Mac; a CA bundle can be passed as a build
+secret for TLS-inspecting proxies), or copied from a Linux host's build (seconds instead of minutes).
+`scripts/build-computer-image.sh` picks one. The shared driver suite and all 13 browser flows pass on Docker
+(`E2E_DOCKER=1`); wakes took 340 ms (median) to 463 ms.
+
+**Why.** The first Docker driver mounted the host's agent binary into a stock Python image. That can't work on a Mac
+(a macOS binary in a Linux container) and depends on matching C libraries on Linux. It also couldn't reach a control
+plane listening on 127.0.0.1, or the demo sites.
+
+**Alternatives.** Listen on 0.0.0.0 (exposes the whole API to the local network). `--network host` (computers would
+share the host's network again, losing the isolation that is the point of Docker). A static musl agent (rustls'
+crypto needs a C toolchain for musl; more build trouble than it saves).
+
+**Not yet.** Disk size limits (a bind mount has none), egress filtering, and running the agent as a non-root user
+inside the container.
+
+## 2026-10-01: dev.sh watches for changes; a `git pull` is the whole loop
+
+**Decision.** While `./scripts/dev.sh` runs, Rust changes rebuild and restart the control plane (computers keep
+running and reconnect; they get a rebuilt agent at their next wake, as the architecture's agent updates do). A failed
+build leaves the previous version running. A changed web lockfile reinstalls packages; Vite already reloads the web
+app. `--no-watch` turns it off; `--e2e` never watches. In-memory dev state (the moved clock, planted demo data)
+resets on a restart.
+
+**Why.** The founder iterates by pulling the branch and trying it. Without this, every pull meant stopping and
+restarting the script.
+
+**Alternatives.** cargo-watch or watchexec (another tool to install). A public preview link from the agent's cloud
+session (the session's container takes no incoming connections; a tunnel would make the app and its Dev tools,
+which show sign-in links, public).
+
 ## 2026-10-01: Light-mode "needs you" is #9a5b00, not #c2410c
 
 **Decision.** The scheme check (text 4.5:1, controls 3:1, statuses distinguishable) runs as a unit test on every
