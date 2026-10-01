@@ -94,3 +94,12 @@ offers.
 | `docs/architecture.md` | How it is built, and the build order |
 | `docs/decisions.md` | Every decision with lasting impact, newest first |
 | `docs/design.md` | Links to the design canvases and the design tokens |
+| `docs/local-guide.md` | Starting the prototype locally and trying each flow |
+| `crates/proto` | The agent–relay wire protocol and shared types (run specs, watcher types) |
+| `crates/relay` | The relay: agent connections, credentials, stream multiplexing |
+| `crates/agent` | The agent on every computer: Files, runs, the watcher engine, the Code worker, previews |
+| `crates/server` | The control plane: API, orchestrator, scheduler, ledger, providers (mocks), preview edge |
+| `crates/server/catalog` | Data: the plan catalog seed, the color scheme, built-in watcher types |
+| `web` | The SvelteKit web app |
+| `e2e` | Playwright tests, one per prototype flow |
+| `scripts` | `dev.sh` (run everything), `check.sh` (check everything) |
