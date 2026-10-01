@@ -36,9 +36,9 @@ test('a computer wakes, sleeps about 30 seconds after nothing is active, and wak
 	});
 	const due = new Date(made.job.next_due_at).getTime() - new Date(me.now).getTime();
 	await api(page, 'POST', '/dev/clock', { secs: Math.ceil(due / 1000) + 1 });
-	await page.goto(`/scripts/${made.job.id}`);
-	await expect(page.locator('table')).toContainText('Backed up Scripts', { timeout: 30_000 });
-	await expect(page.locator('table')).toContainText('on schedule');
+	await page.goto(`/scripts/${made.job.id}?tab=runs`);
+	await expect(page.getByTestId('headline')).toContainText('Backed up Scripts', { timeout: 30_000 });
+	await expect(page.getByText('on schedule', { exact: true })).toBeVisible();
 
 	// The details layer shows the measured wake times.
 	await page.goto('/computer');

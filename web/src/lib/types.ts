@@ -90,6 +90,10 @@ export type RunBrief = {
 	attempt: number;
 	started_by: string;
 	data: Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
+	exit_code?: number | null;
+	error_fix?: string | null;
+	changes?: { path: string; kind: string; size: number }[] | null;
+	progress?: { done?: number | null; total?: number | null } | null;
 };
 
 export type Job = {
@@ -114,4 +118,8 @@ export type Job = {
 	secret_names: string[];
 	runs?: RunBrief[];
 	rule?: string;
+	window_start?: number | null;
+	window_end?: number | null;
+	settle_secs?: number;
+	time_zone?: string;
 };

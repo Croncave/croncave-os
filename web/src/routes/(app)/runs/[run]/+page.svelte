@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { get, post, message } from '$lib/api';
 	import { onLive, throttle } from '$lib/live';
@@ -21,6 +22,8 @@
 		try {
 			run = await get(`/runs/${id}`);
 			if (run.computer_id !== session.computerId) setComputer(run.computer_id);
+			// A script's runs live on its page, under Runs.
+			if (run.job.app === 'scripts' && run.trigger !== 'test') goto(`/scripts/${run.job.id}?tab=runs&run=${run.id}`, { replaceState: true });
 		} catch (e) {
 			error = message(e);
 		}

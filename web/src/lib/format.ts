@@ -122,3 +122,33 @@ export function clock(iso: string | null | undefined, now = new Date()): string 
 export function appIcon(app: string): string {
 	return ({ watcher: 'eye', scripts: 'code', code: 'braces', files: 'folder', billing: 'card', data: 'data', fetcher: 'download', computer: 'server' } as Record<string, string>)[app] ?? 'activity';
 }
+
+/** "3:00 PM". */
+export function timeOfDay(iso: string | null | undefined): string {
+	if (!iso) return '';
+	return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** "1 h 12 min", "4 min", "2 days". */
+export function span(secs: number): string {
+	const s = Math.max(0, Math.round(secs));
+	if (s < 60) return `${s} s`;
+	if (s < 3600) return `${Math.round(s / 60)} min`;
+	if (s < 86400) {
+		const h = Math.floor(s / 3600);
+		const m = Math.round((s % 3600) / 60);
+		return m ? `${h} h ${m} min` : `${h} h`;
+	}
+	const d = Math.round(s / 86400);
+	return `${d} day${d === 1 ? '' : 's'}`;
+}
+
+/** "today at 2:00 AM", "yesterday at 2:00 AM", "Sep 28 at 2:00 AM". */
+export function dayAndTime(iso: string | null | undefined): string {
+	if (!iso) return '';
+	const d = new Date(iso);
+	const t = timeOfDay(iso);
+	if (d.toDateString() === new Date().toDateString()) return `today at ${t}`;
+	if (d.toDateString() === new Date(Date.now() - 86400_000).toDateString()) return `yesterday at ${t}`;
+	return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${t}`;
+}
