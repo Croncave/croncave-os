@@ -68,7 +68,10 @@ pub async fn types(State(app): State<AppState>, auth: Auth) -> ApiResult<Json<Va
         .into_iter()
         .map(|(id, version, config, origin, approved)| {
             let reads = match config.pointer("/source/type").and_then(Value::as_str) {
-                Some("http") => format!("Reads the web page at {}", config.pointer("/source/url").and_then(Value::as_str).unwrap_or("")),
+                Some("http") => match config.pointer("/source/url").and_then(Value::as_str).unwrap_or("") {
+                    u if u.contains('{') => "Reads the web page you give it, from your computer".to_string(),
+                    u => format!("Reads the web page at {u}"),
+                },
                 Some("platform") => "Reads prices from Croncave's market data".to_string(),
                 _ => String::new(),
             };
