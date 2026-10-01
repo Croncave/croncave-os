@@ -31,6 +31,8 @@ test('Home and Activity show what happened, unread notifications, and update wit
 	await expect(page.getByTestId('unread')).toHaveCount(0);
 
 	// Notifications went out by email (the outbox).
-	const outbox = await api(page, 'GET', '/dev/outbox');
-	expect(outbox.messages.some((m: { subject: string }) => m.subject.includes('"Broken job" failed'))).toBeTruthy();
+	// Delivery is asynchronous (the notifier runs every couple of seconds).
+	await expect
+		.poll(async () => (await api(page, 'GET', '/dev/outbox')).messages.map((m: { subject: string }) => m.subject).join('\n'))
+		.toContain('"Broken job" failed');
 });
