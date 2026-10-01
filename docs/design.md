@@ -17,6 +17,8 @@ The designs live on claude.ai design canvases (private to the founder's account)
 - Plans and Billing (sign-up: your details, time zone picker listing all US time zones, and mobile number; confirm the
   phone code; plans; trial offer, plan and usage, spending and overage, usage ran out,
   trial ending): https://claude.ai/artifact/RubDfGiospYk7fYPEpgoAD
+- Color schemes (a picker that recolors Home, Plan and usage, and Settings › Appearance in ten schemes, light and
+  dark; the Appearance screen is the picker to build, see `color-schemes.md`): https://claude.ai/artifact/QQYkK2wafZr5RWor5aVzdJ
 - Pricing model (interactive): https://claude.ai/artifact/QqDfEEf1QZ8cDMu4nkFiV8
 
 ## Look
