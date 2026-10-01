@@ -8,7 +8,8 @@ test('set up a watch from a type, test it, save it, and see a planted listing fo
 	await page.getByRole('link', { name: 'New watch' }).click();
 	await page.locator('[data-type=demo-listings]').click();
 	await page.getByLabel('Most rent per month').fill('2200');
-	await page.getByLabel('Listings page').fill('http://127.0.0.1:18080/demo/listings');
+	// The default address is wherever computers reach the demo site (the host, or the Docker bridge).
+	await expect(page.getByLabel('Listings page')).toHaveValue(/\/demo\/listings$/);
 	await expect(page.getByTestId('plain-words')).toContainText('tell me about new listings up to $2200 a month with 1+ bedrooms');
 	await expect(page.getByTestId('plain-words')).toContainText('every hour');
 
@@ -43,7 +44,8 @@ test('a stock price watch draws its history and a missing page is "couldn\'t che
 
 	await page.goto('/watcher/new');
 	await page.locator('[data-type=web-page]').click();
-	await page.getByLabel('Page address').fill('http://127.0.0.1:18080/demo/moved');
+	const page_address = page.getByLabel('Page address');
+	await page_address.fill((await page_address.inputValue()).replace('/demo/page', '/demo/moved'));
 	await page.getByRole('button', { name: 'Test it now' }).click();
 	await expect(page.getByTestId('test-result')).toContainText("Couldn't check");
 	await expect(page.getByTestId('why')).toContainText('404');

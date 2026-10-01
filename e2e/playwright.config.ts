@@ -17,10 +17,13 @@ export default defineConfig({
 		viewport: { width: 1360, height: 900 }
 	},
 	webServer: {
-		command: '../scripts/dev.sh --e2e',
+		// E2E_DOCKER=1 runs the same flows with computers as Docker containers.
+		command: `../scripts/dev.sh --e2e${process.env.E2E_DOCKER ? ' --docker' : ''}`,
 		url: 'http://localhost:15173',
 		timeout: 400_000,
 		reuseExistingServer: !process.env.CI,
-		stdout: 'pipe'
+		stdout: 'pipe',
+		// Let dev.sh stop its computers (agent processes or containers) on the way out.
+		gracefulShutdown: { signal: 'SIGTERM', timeout: 15_000 }
 	}
 });
