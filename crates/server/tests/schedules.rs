@@ -75,3 +75,54 @@ async fn a_computer_that_doesnt_wake_for_schedules_holds_the_run() {
         .unwrap();
     assert!(wake.is_none(), "the computer was not asked to wake");
 }
+
+#[tokio::test]
+async fn a_window_keeps_scheduled_runs_inside_part_of_the_day() {
+    let s = common::stack().await;
+    s.sign_up("window@example.com", "4155550133", "free", None, false).await;
+    let c = s.post("/computers", json!({ "name": "Hours", "size": "small" })).await;
+    let c = c["id"].as_str().unwrap().to_string();
+    s.post(&format!("/computers/{c}/scripts/template"), json!({ "template": "csv-report" })).await;
+    let made = s
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Daytime", "path": "Scripts/csv-report/report.py", "trigger": "schedule",
+                    "schedule": "0 */3 * * *", "window": { "start_min": 360, "end_min": 1440 } }),
+        )
+        .await;
+    assert_eq!(made["job"]["schedule_words"], "Every 3 hours, from 6 AM to midnight ET");
+    let job = made["job"]["id"].as_str().unwrap().to_string();
+    let next: DateTime<Utc> = made["job"]["next_due_at"].as_str().unwrap().parse().unwrap();
+    let there = next.with_timezone(&chrono_tz::America::New_York);
+    assert!(there.hour() >= 6, "the next run is inside the window, got {there}");
+
+    // Clearing the window brings the night slots back.
+    let j = s.patch(&format!("/jobs/{job}"), json!({ "window": {} })).await;
+    assert_eq!(j["schedule_words"], "Every 3 hours");
+}
+
+#[tokio::test]
+async fn a_draft_can_be_test_run_and_asked_to_tell_me() {
+    let s = common::stack().await;
+    s.sign_up("draft@example.com", "4155550134", "free", None, false).await;
+    let c = s.post("/computers", json!({ "name": "Drafts", "size": "small" })).await;
+    let c = c["id"].as_str().unwrap().to_string();
+    s.post(&format!("/computers/{c}/scripts/template"), json!({ "template": "csv-report" })).await;
+    let made = s
+        .post(
+            &format!("/computers/{c}/scripts"),
+            json!({ "name": "Try", "path": "Scripts/csv-report/report.py", "status": "draft", "test_now": true }),
+        )
+        .await;
+    assert_eq!(made["job"]["status"], "draft");
+    let run = made["run_id"].as_str().expect("a test run started").to_string();
+    let r = s.get(&format!("/runs/{run}")).await;
+    assert_eq!(r["trigger"], "test");
+    s.post(&format!("/runs/{run}/tell-me"), json!({ "on": true })).await;
+    let (tell,): (bool,) = sqlx::query_as("select tell_me from runs where id = $1")
+        .bind(run.parse::<uuid::Uuid>().unwrap())
+        .fetch_one(&s.app.db)
+        .await
+        .unwrap();
+    assert!(tell);
+}

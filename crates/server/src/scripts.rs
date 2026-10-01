@@ -34,8 +34,17 @@ pub struct NewScript {
     pub secrets: Vec<crate::jobs::SecretBody>,
     #[serde(default)]
     pub run_now: bool,
+    /// Try it once without counting it as a run (the Add screen's test run).
+    #[serde(default)]
+    pub test_now: bool,
+    #[serde(default = "yes")]
+    pub install: bool,
     #[serde(flatten)]
     pub opts: JobOptions,
+}
+
+fn yes() -> bool {
+    true
 }
 
 pub async fn create(
@@ -46,8 +55,12 @@ pub async fn create(
 ) -> ApiResult<Json<Value>> {
     auth.require_ready()?;
     let c = crate::computers::load(&app, &auth, computer).await?;
-    let setup =
-        ScriptSetup { path: b.path.trim().trim_start_matches('/').to_string(), runtime: b.runtime, args: b.args };
+    let setup = ScriptSetup {
+        path: b.path.trim().trim_start_matches('/').to_string(),
+        runtime: b.runtime,
+        args: b.args,
+        install: b.install,
+    };
     check_setup(&setup)?;
     let job = crate::jobs::create_job(
         &app,
@@ -71,7 +84,15 @@ pub async fn create(
             .await?;
         }
     }
-    let run = if b.run_now { Some(crate::jobs::start_now(&app, &auth, &job, "manual", None).await?) } else { None };
+    let run = if b.test_now {
+        let mut setup = job.setup.clone();
+        setup["test"] = json!(true);
+        Some(crate::jobs::start_now(&app, &auth, &job, "test", Some(setup)).await?)
+    } else if b.run_now {
+        Some(crate::jobs::start_now(&app, &auth, &job, "manual", None).await?)
+    } else {
+        None
+    };
     Ok(Json(json!({ "job": crate::jobs::job_view(&app, &job).await?, "run_id": run })))
 }
 

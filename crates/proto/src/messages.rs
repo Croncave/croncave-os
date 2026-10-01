@@ -100,6 +100,11 @@ pub enum AgentEvent {
         cpu_percent: f32,
         memory_mb: u64,
         message: Option<String>,
+        /// How far the run says it is, read from its output ("step 6,200 of 10,000").
+        #[serde(default)]
+        done: Option<u64>,
+        #[serde(default)]
+        total: Option<u64>,
     },
     /// The run (usually a coding agent) wants a person to approve something.
     NeedsApproval {
@@ -133,6 +138,9 @@ pub struct Health {
     pub memory_mb: u64,
     pub disk_bytes: u64,
     pub trash_bytes: u64,
+    /// The runtimes on the computer and their versions ("python": "3.12.3").
+    #[serde(default)]
+    pub runtimes: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -228,6 +236,13 @@ pub struct ScriptSetup {
     pub runtime: Option<Runtime>,
     #[serde(default)]
     pub args: Vec<String>,
+    /// Install packages from requirements.txt or package.json before running.
+    #[serde(default = "yes")]
+    pub install: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

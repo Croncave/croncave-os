@@ -28,7 +28,8 @@ pub async fn run(mut ctx: RunCtx) -> RunResult {
     let summary_path = run_dir.join("summary.json");
 
     let mut env: Vec<(String, String)> = Vec::new();
-    match install_packages(&ctx, runtime, &workdir).await {
+    let installed = if setup.install { install_packages(&ctx, runtime, &workdir).await } else { Ok(None) };
+    match installed {
         Ok(Some((k, v))) => env.push((k, v)),
         Ok(None) => {}
         Err(e) => return failed(&ctx, e),

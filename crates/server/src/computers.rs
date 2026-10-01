@@ -265,14 +265,15 @@ pub async fn update(
         }
         // The computer's jobs follow it, and their next runs move to the new zone's clock.
         sqlx::query("update computers set time_zone = $2 where id = $1").bind(id).bind(z).execute(&mut *tx).await?;
-        let jobs: Vec<(Uuid, Option<String>, String)> =
-            sqlx::query_as("select id, schedule, status from jobs where computer_id = $1 and status <> 'deleted'")
+        let jobs: Vec<(Uuid, Option<String>, String, Option<i32>, Option<i32>)> = sqlx::query_as(
+            "select id, schedule, status, window_start, window_end from jobs where computer_id = $1 and status <> 'deleted'",
+        )
                 .bind(id)
                 .fetch_all(&mut *tx)
                 .await?;
-        for (job, schedule, status) in jobs {
+        for (job, schedule, status, start, end) in jobs {
             let next = if status == "active" {
-                schedule.as_deref().and_then(|s| crate::jobs::next_after(s, z, app.now()))
+                schedule.as_deref().and_then(|s| crate::jobs::next_in_window(s, z, start.zip(end), app.now()))
             } else {
                 None
             };

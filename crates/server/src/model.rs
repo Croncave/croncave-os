@@ -106,6 +106,16 @@ pub struct Job {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub time_zone: String,
+    pub window_start: Option<i32>,
+    pub window_end: Option<i32>,
+    pub settle_secs: i32,
+}
+
+impl Job {
+    /// The part of the day the schedule runs in, if limited.
+    pub fn window(&self) -> Option<(i32, i32)> {
+        self.window_start.zip(self.window_end)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -138,6 +148,7 @@ pub struct Run {
     pub progress: Option<Value>,
     pub awake_seconds: i32,
     pub ai_cost_micros: i64,
+    pub tell_me: Option<bool>,
 }
 
 pub const ACTIVE_RUN_STATES: &[&str] = &["queued", "waiting", "starting", "running"];

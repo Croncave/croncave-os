@@ -48,8 +48,60 @@ pub fn min_interval_secs(schedule: &cron::Schedule, from: DateTime<Utc>) -> i64 
 
 /// The next run after `after`, reading the schedule's hours in the job's time zone.
 pub fn next_after(schedule: &str, zone: &str, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    next_in_window(schedule, zone, None, after)
+}
+
+/// The next run after `after` that falls inside the day's window, if there is one.
+pub fn next_in_window(
+    schedule: &str,
+    zone: &str,
+    window: Option<(i32, i32)>,
+    after: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    use chrono::Timelike;
     let tz = crate::zones::tz(zone);
-    parse_schedule(schedule).ok()?.1.after(&after.with_timezone(&tz)).next().map(|t| t.with_timezone(&Utc))
+    let (_, sch) = parse_schedule(schedule).ok()?;
+    // A window can skip most slots of a fast schedule; look far enough to find the next one.
+    sch.after(&after.with_timezone(&tz))
+        .take(20_000)
+        .find(|t| window.is_none_or(|w| in_window((t.hour() * 60 + t.minute()) as i32, w)))
+        .map(|t| t.with_timezone(&Utc))
+}
+
+/// Whether a minute of the day is inside `[start, end)`; an end before the start wraps past midnight.
+pub fn in_window(minute: i32, (start, end): (i32, i32)) -> bool {
+    if start <= end { minute >= start && minute < end } else { minute >= start || minute < end }
+}
+
+/// "from 6 AM to midnight".
+pub fn window_words((start, end): (i32, i32)) -> String {
+    let t = |m: i32| match m.rem_euclid(1440) {
+        0 => "midnight".to_string(),
+        720 => "noon".to_string(),
+        m => {
+            let (h, min) = (m / 60, m % 60);
+            let (h12, ampm) = match h {
+                0 => (12, "AM"),
+                1..=11 => (h, "AM"),
+                12 => (12, "PM"),
+                _ => (h - 12, "PM"),
+            };
+            if min == 0 { format!("{h12} {ampm}") } else { format!("{h12}:{min:02} {ampm}") }
+        }
+    };
+    format!("from {} to {}", t(start), t(end))
+}
+
+/// The schedule in words, with its window: "Every 3 hours, from 6 AM to midnight ET".
+pub fn describe_job_schedule(job: &Job) -> Option<String> {
+    let s = job.schedule.as_deref()?;
+    let words = describe_schedule(s, &job.time_zone);
+    Some(match job.window() {
+        // The window's hours are clock times too, so name the zone once at the end.
+        Some(w) if words.ends_with(crate::zones::short(&job.time_zone)) => format!("{words}, {}", window_words(w)),
+        Some(w) => format!("{words}, {} {}", window_words(w), crate::zones::short(&job.time_zone)),
+        None => words,
+    })
 }
 
 /// A schedule in plain words; clock times are in `zone` ("Every day at 9:00 am ET").
@@ -133,6 +185,16 @@ pub struct JobOptions {
     pub notify: Option<Value>,
     /// active, paused or draft
     pub status: Option<String>,
+    /// Run only within part of the day; both empty clears it.
+    pub window: Option<WindowInput>,
+    /// For file triggers: wait this long after the last change before running.
+    pub settle_secs: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct WindowInput {
+    pub start_min: Option<i32>,
+    pub end_min: Option<i32>,
 }
 
 pub struct ValidOptions {
@@ -143,6 +205,8 @@ pub struct ValidOptions {
     pub max_runtime_secs: i32,
     pub retries: i32,
     pub max_spend_micros: Option<i64>,
+    pub window: Option<(i32, i32)>,
+    pub settle_secs: i32,
 }
 
 pub async fn validate_options(
@@ -202,7 +266,31 @@ pub async fn validate_options(
         Some(d) => Some(crate::catalog::micros(d)),
         None => current.and_then(|j| j.max_spend_micros),
     };
-    Ok(ValidOptions { trigger, schedule, watch_path, overlap, max_runtime_secs, retries, max_spend_micros })
+    let window = match &o.window {
+        Some(WindowInput { start_min: Some(s), end_min: Some(e) }) => {
+            if !(0..1440).contains(s) || !(0..=1440).contains(e) || s == e {
+                return Err(ApiError::bad("Choose a start and an end time for the hours it runs."));
+            }
+            Some((*s, *e))
+        }
+        Some(_) => None,
+        None => current.and_then(Job::window),
+    };
+    let settle_secs = o.settle_secs.or(current.map(|j| j.settle_secs)).unwrap_or(0);
+    if !(0..=3600).contains(&settle_secs) {
+        return Err(ApiError::bad("Wait at most an hour for more files."));
+    }
+    Ok(ValidOptions {
+        trigger,
+        schedule,
+        watch_path,
+        overlap,
+        max_runtime_secs,
+        retries,
+        max_spend_micros,
+        window,
+        settle_secs,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -226,7 +314,7 @@ pub async fn create_job(
         return Err(ApiError::bad("Give it a name (up to 80 characters)."));
     }
     let next_due = if status == "active" {
-        v.schedule.as_deref().and_then(|s| next_after(s, &computer.time_zone, app.now()))
+        v.schedule.as_deref().and_then(|s| next_in_window(s, &computer.time_zone, v.window, app.now()))
     } else {
         None
     };
@@ -234,8 +322,9 @@ pub async fn create_job(
     let mut tx = app.db.begin().await?;
     sqlx::query(
         "insert into jobs (id, account_id, computer_id, app, kind, name, setup, trigger, schedule, watch_path, overlap,
-                           max_runtime_secs, retries, max_spend_micros, notify, status, next_due_at, created_by_kind, created_by, time_zone)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)",
+                           max_runtime_secs, retries, max_spend_micros, notify, status, next_due_at, created_by_kind, created_by, time_zone,
+                           window_start, window_end, settle_secs)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)",
     )
     .bind(id)
     .bind(auth.account.id)
@@ -257,6 +346,9 @@ pub async fn create_job(
     .bind(auth.actor_kind)
     .bind(auth.user.id)
     .bind(&computer.time_zone)
+    .bind(v.window.map(|w| w.0))
+    .bind(v.window.map(|w| w.1))
+    .bind(v.settle_secs)
     .execute(&mut *tx)
     .await?;
     crate::measure::audit(
@@ -375,7 +467,7 @@ pub async fn schedule_due(app: &AppState) -> anyhow::Result<usize> {
         {
             queued += 1;
         }
-        let next = job.schedule.as_deref().and_then(|s| next_after(s, &job.time_zone, now));
+        let next = job.schedule.as_deref().and_then(|s| next_in_window(s, &job.time_zone, job.window(), now));
         sqlx::query("update jobs set next_due_at = $2 where id = $1").bind(job.id).bind(next).execute(&mut *tx).await?;
     }
     tx.commit().await?;
@@ -432,6 +524,13 @@ pub async fn dispatch(app: &AppState) -> anyhow::Result<()> {
             continue;
         }
         let job: Job = sqlx::query_as("select * from jobs where id = $1").bind(run.job_id).fetch_one(&app.db).await?;
+        // A file-triggered run waits for changes to settle (each new change restarts the wait).
+        if run.status == "queued"
+            && run.trigger == "files"
+            && (now - run.queued_at).num_seconds() < job.settle_secs as i64
+        {
+            continue;
+        }
         let computer: Computer =
             sqlx::query_as("select * from computers where id = $1").bind(run.computer_id).fetch_one(&app.db).await?;
         if run.status == "starting" {
@@ -543,7 +642,7 @@ pub async fn job_view(app: &AppState, job: &Job) -> ApiResult<Value> {
             .fetch_optional(&app.db)
             .await?;
     let mut v = serde_json::to_value(job).unwrap_or_default();
-    v["schedule_words"] = json!(job.schedule.as_deref().map(|s| describe_schedule(s, &job.time_zone)));
+    v["schedule_words"] = json!(describe_job_schedule(job));
     v["last_run"] = json!(last.map(|r| run_brief(&r)));
     let secrets: Vec<(String,)> = sqlx::query_as("select name from secrets where job_id = $1 order by name")
         .bind(job.id)
@@ -558,6 +657,8 @@ pub fn run_brief(r: &Run) -> Value {
         "id": r.id, "status": r.status, "status_note": r.status_note, "trigger": r.trigger, "headline": r.headline,
         "queued_at": r.queued_at, "started_at": r.started_at, "ended_at": r.ended_at, "error_plain": r.error_plain,
         "summary": r.summary, "attempt": r.attempt, "started_by": r.started_by_kind, "data": r.data,
+        "exit_code": r.exit_code, "error_fix": r.error_fix, "changes": r.changes,
+        "progress": r.progress.as_ref().map(|p| json!({ "done": p.get("done"), "total": p.get("total") })),
     })
 }
 
@@ -626,14 +727,15 @@ pub async fn update(
     };
     let name = b.opts.name.clone().unwrap_or(job.name.clone());
     let next_due = if status == "active" {
-        v.schedule.as_deref().and_then(|s| next_after(s, &job.time_zone, app.now()))
+        v.schedule.as_deref().and_then(|s| next_in_window(s, &job.time_zone, v.window, app.now()))
     } else {
         None
     };
     let mut tx = app.db.begin().await?;
     sqlx::query(
         "update jobs set name = $2, setup = $3, trigger = $4, schedule = $5, watch_path = $6, overlap = $7, max_runtime_secs = $8,
-                retries = $9, max_spend_micros = $10, notify = coalesce($11, notify), status = $12, next_due_at = $13, updated_at = $14
+                retries = $9, max_spend_micros = $10, notify = coalesce($11, notify), status = $12, next_due_at = $13, updated_at = $14,
+                window_start = $15, window_end = $16, settle_secs = $17
          where id = $1",
     )
     .bind(id)
@@ -650,6 +752,9 @@ pub async fn update(
     .bind(&status)
     .bind(next_due)
     .bind(app.now())
+    .bind(v.window.map(|w| w.0))
+    .bind(v.window.map(|w| w.1))
+    .bind(v.settle_secs)
     .execute(&mut *tx)
     .await?;
     let action = match (job.status.as_str(), status.as_str()) {
@@ -796,6 +901,23 @@ pub async fn run_output(
     Ok(Json(
         json!({ "output": output.into_iter().map(|(i, s, t, at)| json!({ "id": i, "stream": s, "text": t, "at": at })).collect::<Vec<_>>() }),
     ))
+}
+
+#[derive(Deserialize)]
+pub struct TellMe {
+    pub on: bool,
+}
+
+/// "Tell me when it finishes", for one run.
+pub async fn tell_me(
+    State(app): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    Json(b): Json<TellMe>,
+) -> ApiResult<Json<Value>> {
+    let run = load_run(&app, &auth, id).await?;
+    sqlx::query("update runs set tell_me = $2 where id = $1").bind(run.id).bind(b.on).execute(&app.db).await?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 pub async fn stop_run(State(app): State<AppState>, auth: Auth, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
@@ -983,6 +1105,22 @@ mod tests {
         assert_eq!(describe_schedule("0 0 * * * *", "America/New_York"), "Every hour");
         assert_eq!(describe_schedule("0 30 9 * * *", "America/New_York"), "Every day at 9:30 am ET");
         assert_eq!(describe_schedule("0 0 18 * * 1-5", "America/Los_Angeles"), "Weekdays at 6:00 pm PT");
+    }
+
+    #[test]
+    fn a_window_keeps_runs_inside_part_of_the_day() {
+        use chrono::TimeZone;
+        // Every 3 hours from 6 AM to midnight, Eastern. At 10 PM local (02:00 UTC next day in
+        // summer) the next slot inside the window is 6 AM, not midnight or 3 AM.
+        let at = Utc.with_ymd_and_hms(2026, 7, 2, 2, 0, 0).unwrap();
+        let next = next_in_window("0 */3 * * *", "America/New_York", Some((360, 1440)), at).unwrap();
+        assert_eq!(next, Utc.with_ymd_and_hms(2026, 7, 2, 10, 0, 0).unwrap());
+        assert!(in_window(23 * 60, (360, 1440)));
+        assert!(!in_window(0, (360, 1440)));
+        // A window past midnight wraps.
+        assert!(in_window(30, (1320, 120)) && !in_window(600, (1320, 120)));
+        assert_eq!(window_words((360, 1440)), "from 6 AM to midnight");
+        assert_eq!(window_words((450, 1380)), "from 7:30 AM to 11 PM");
     }
 
     #[test]

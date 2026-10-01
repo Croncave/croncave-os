@@ -78,6 +78,7 @@ pub fn router(app: AppState) -> Router {
         .route("/runs/{id}", get(jobs::get_run))
         .route("/runs/{id}/output", get(jobs::run_output))
         .route("/runs/{id}/stop", post(jobs::stop_run))
+        .route("/runs/{id}/tell-me", post(jobs::tell_me))
         .route("/runs/{id}/retry", post(jobs::retry_run))
         .route("/runs/{id}/files", get(files_api::run_files))
         .route("/runs/{id}/approvals/{request}", post(jobs::approve))

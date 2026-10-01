@@ -205,6 +205,7 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
     let mut progress = tokio::time::interval(Duration::from_secs(3));
     let mut stop = ctx.stop.clone();
     let mut lines_open = true;
+    let mut step: Option<(u64, Option<u64>)> = None;
     let ended_by: Option<RunOutcome> = loop {
         tokio::select! {
             line = line_rx.recv(), if lines_open => match line {
@@ -220,6 +221,9 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
                             });
                         }
                         continue;
+                    }
+                    if let Some(p) = parse_progress(&line) {
+                        step = Some(p);
                     }
                     let masked = mask(&line, &ctx.spec.secrets);
                     tail.push_back(masked.clone());
@@ -247,7 +251,14 @@ pub async fn supervise(ctx: &mut RunCtx, mut cmd: Command, workdir: &Path) -> Pr
                 if let Some(pid) = pid {
                     let (cpu, mem) = group_usage(pid).await;
                     *ctx.usage.lock().expect("usage") = (cpu, mem);
-                    ctx.agent.emit(AgentEvent::RunProgress { run_id: ctx.spec.run_id, cpu_percent: cpu, memory_mb: mem, message: None });
+                    ctx.agent.emit(AgentEvent::RunProgress {
+                        run_id: ctx.spec.run_id,
+                        cpu_percent: cpu,
+                        memory_mb: mem,
+                        message: None,
+                        done: step.map(|s| s.0),
+                        total: step.and_then(|s| s.1),
+                    });
                 }
             },
             _ = tokio::time::sleep_until(deadline) => break Some(RunOutcome::TimedOut),
@@ -353,7 +364,55 @@ pub fn human_secs(s: u64) -> String {
 }
 
 /// Report the computer's health every 30 seconds.
+/// How far a run is, from a line of its output: "step 6,200 of 10,000", "step 6200/10000",
+/// "[6200/10000]", "6200 of 10000", or "62%". Lines naming a step win over other counts
+/// ("epoch 12/20 step 5,800" is step 5,800).
+pub fn parse_progress(line: &str) -> Option<(u64, Option<u64>)> {
+    use std::sync::LazyLock;
+    static STEP: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(?i)\bsteps?\s+(\d[\d,]*)(?:\s*(?:/|of)\s*(\d[\d,]*))?").expect("regex"));
+    static OF: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(?i)(\d[\d,]*)\s*(?:/|\bof\b)\s*(\d[\d,]*)").expect("regex"));
+    static PCT: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(\d{1,3})(?:\.\d+)?\s*%").expect("regex"));
+    let n = |s: &str| s.replace(',', "").parse::<u64>().ok();
+    if let Some(c) = STEP.captures(line) {
+        let done = n(&c[1])?;
+        let total = c.get(2).and_then(|t| n(t.as_str())).filter(|t| *t >= done && *t > 0);
+        return Some((done, total));
+    }
+    if let Some(c) = OF.captures(line) {
+        let (done, total) = (n(&c[1])?, n(&c[2])?);
+        if total > 0 && done <= total {
+            return Some((done, Some(total)));
+        }
+    }
+    if let Some(c) = PCT.captures(line) {
+        let p = n(&c[1])?;
+        if p <= 100 {
+            return Some((p, Some(100)));
+        }
+    }
+    None
+}
+
+/// The runtimes installed on this computer, asked once ("python": "3.12.3").
+pub fn runtimes() -> std::collections::BTreeMap<String, String> {
+    let ask = |cmd: &str, arg: &str| -> Option<String> {
+        let out = std::process::Command::new(cmd).arg(arg).output().ok()?;
+        let text = String::from_utf8_lossy(if out.stdout.is_empty() { &out.stderr } else { &out.stdout }).into_owned();
+        let re = regex::Regex::new(r"(\d+\.\d+(?:\.\d+)?)").ok()?;
+        re.captures(text.lines().next()?).map(|c| c[1].to_string())
+    };
+    let python = std::env::var("CRONCAVE_PYTHON").unwrap_or_else(|_| "python3".into());
+    [("python", ask(&python, "--version")), ("node", ask("node", "--version")), ("bash", ask("bash", "--version"))]
+        .into_iter()
+        .filter_map(|(k, v)| Some((k.to_string(), v?)))
+        .collect()
+}
+
 pub async fn report_health(agent: Arc<Agent>) {
+    let runtimes = tokio::task::spawn_blocking(runtimes).await.unwrap_or_default();
     loop {
         let (cpu, mem) = agent.runs.usage();
         let disk = agent.disk.clone();
@@ -362,7 +421,13 @@ pub async fn report_health(agent: Arc<Agent>) {
         })
         .await
         .unwrap_or((0, 0));
-        agent.emit(AgentEvent::Health(Health { cpu_percent: cpu, memory_mb: mem, disk_bytes, trash_bytes }));
+        agent.emit(AgentEvent::Health(Health {
+            cpu_percent: cpu,
+            memory_mb: mem,
+            disk_bytes,
+            trash_bytes,
+            runtimes: runtimes.clone(),
+        }));
         tokio::time::sleep(Duration::from_secs(30)).await;
     }
 }
@@ -375,6 +440,17 @@ mod tests {
     fn secrets_are_masked() {
         let s = vec![("API_KEY".into(), "sk-12345".into()), ("SHORT".into(), "ab".into())];
         assert_eq!(mask("key=sk-12345 ab", &s), "key=•••••• ab");
+    }
+
+    #[test]
+    fn progress_is_read_from_output_lines() {
+        assert_eq!(parse_progress("epoch 13/20  step 6,200 of 10,000  loss 0.40"), Some((6200, Some(10000))));
+        assert_eq!(parse_progress("step 6200/10000"), Some((6200, Some(10000))));
+        assert_eq!(parse_progress("epoch 12/20  step 5,800  loss 0.412"), Some((5800, None)));
+        assert_eq!(parse_progress("[31/212] fetched"), Some((31, Some(212))));
+        assert_eq!(parse_progress("Fetching page 2 of 4…"), Some((2, Some(4))));
+        assert_eq!(parse_progress("Upload 62% done"), Some((62, Some(100))));
+        assert_eq!(parse_progress("Done in 38.2 s"), None);
     }
 
     #[test]

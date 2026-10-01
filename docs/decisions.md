@@ -3,6 +3,27 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Scripts can keep to part of the day, wait for files to settle, and report progress
+
+**Decision.** The Scripts design's controls each have a backend:
+- **Hours it runs.** A job can have a window (`window_start`/`window_end`, minutes of the day in the job's time
+  zone; an end before the start wraps past midnight). The scheduler skips slots outside it, so "every 3 hours,
+  from 6 AM to midnight" never runs at 3 AM.
+- **Wait for more files.** A file-triggered job can wait `settle_secs` after the last change before it runs; each
+  new change restarts the wait, so dropping in twenty files makes one run, not twenty.
+- **Tell me when it finishes**, per run (`runs.tell_me`), on top of the job's own notification settings.
+- **Progress.** The agent reads lines like `step 6,200 of 10,000`, `[31/212]`, `page 2 of 4` or `62%` from a run's output and reports
+  done/total; the run page turns that into a bar and a time left. Scripts that print nothing get no bar.
+- **Runtimes.** The agent reports the Python, Node.js and shell versions it has, so the Add screen offers what
+  the computer can actually run.
+- **Test before saving.** A new script is saved as a draft with a test run; Save turns it on.
+
+**Why.** The design shows each of these; the founder asked for behavior behind every control.
+
+**Alternatives.** Express windows in cron (users can't write it, and it can't wrap midnight cleanly). Debounce
+file events on the computer (it may be asleep when files arrive through the control plane). Ask scripts to call
+an SDK for progress (most scripts are someone else's; reading their output works without changes).
+
 ## 2026-10-01: Files' menu actions are real: zips, copies between computers, pins and Recent
 
 **Decision.** The Files design's right-click menu and sidebar work end to end:

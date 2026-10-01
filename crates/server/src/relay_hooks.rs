@@ -186,10 +186,22 @@ async fn apply(
             )
             .await?;
         }
-        AgentEvent::RunProgress { run_id, cpu_percent, memory_mb, message } => {
+        AgentEvent::RunProgress { run_id, cpu_percent, memory_mb, message, done, total } => {
+            // Keep the last few minutes of CPU and memory for the run's charts.
+            let (old,): (Option<Value>,) = sqlx::query_as("select progress from runs where id = $1")
+                .bind(run_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .unwrap_or((None,));
+            let mut history: Vec<Value> =
+                old.as_ref().and_then(|p| p.get("history")).and_then(Value::as_array).cloned().unwrap_or_default();
+            history.push(json!([(cpu_percent * 10.0).round() / 10.0, memory_mb]));
+            if history.len() > 120 {
+                history.drain(..history.len() - 120);
+            }
             sqlx::query("update runs set progress = $2 where id = $1")
                 .bind(run_id)
-                .bind(json!({ "cpu_percent": cpu_percent, "memory_mb": memory_mb, "message": message }))
+                .bind(json!({ "cpu_percent": cpu_percent, "memory_mb": memory_mb, "message": message, "done": done, "total": total, "history": history }))
                 .execute(&mut *tx)
                 .await?;
             events::live(
@@ -197,7 +209,7 @@ async fn apply(
                 account,
                 "progress",
                 &run_id.to_string(),
-                json!({ "cpu_percent": cpu_percent, "memory_mb": memory_mb }),
+                json!({ "cpu_percent": cpu_percent, "memory_mb": memory_mb, "done": done, "total": total }),
             )
             .await?;
         }
@@ -354,7 +366,10 @@ async fn finish(
     queue_file_triggers(app, tx, computer, Some(job.id), &paths).await?;
 
     let is_test = run.trigger == "test";
-    let notify_on = |k: &str| job.notify.get(k).and_then(Value::as_bool).unwrap_or(k != "finished");
+    let notify_on = |k: &str| {
+        (k == "finished" && run.tell_me == Some(true))
+            || job.notify.get(k).and_then(Value::as_bool).unwrap_or(k != "finished")
+    };
     let base = |level: &'static str, kind: &str, title: String| {
         NewEvent::new(account, &job.app, kind, level, title)
             .computer(computer)
@@ -457,6 +472,13 @@ pub async fn queue_file_triggers(
                 .await?;
         if pending == 0 {
             crate::jobs::queue_run(tx, &job, "files", ("schedule", None), None, None, 1, None, app.now()).await?;
+        } else if job.settle_secs > 0 {
+            // More files arrived while it waits: start the wait over.
+            sqlx::query("update runs set queued_at = $2 where job_id = $1 and status = 'queued' and trigger = 'files'")
+                .bind(job.id)
+                .bind(app.now())
+                .execute(&mut *tx)
+                .await?;
         }
     }
     Ok(())
