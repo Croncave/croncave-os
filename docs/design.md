@@ -4,6 +4,8 @@ The designs live on claude.ai design canvases (private to the founder's account)
 
 - Platform screens (Home, notifications, computer switcher, new computer, settings, Files):
   https://claude.ai/artifact/bec448a6-b6e1-477b-9aea-966e600793a9
+- Sign in and account (sign in, create an account, check your email, set up your account):
+  https://claude.ai/artifact/1zngkuwQZW6NP5SRVVTWMw
 - Plans and Billing (sign-up with phone, plans, trial offer, plan and usage, spending and overage, usage ran out,
   trial ending): https://claude.ai/artifact/RubDfGiospYk7fYPEpgoAD
 - Pricing model (interactive): https://claude.ai/artifact/QqDfEEf1QZ8cDMu4nkFiV8
