@@ -2,8 +2,10 @@
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
 
 *,
 *::before,
@@ -25,7 +27,7 @@ a {
 	text-decoration: none;
 }
 a:hover {
-	text-decoration: underline;
+	color: var(--accent-hover);
 }
 h1,
 h2,
@@ -56,8 +58,10 @@ pre {
 .label {
 	font-family: 'JetBrains Mono', ui-monospace, monospace;
 	font-size: 11px;
+	line-height: 16px;
+	font-weight: 500;
 	text-transform: uppercase;
-	letter-spacing: 0.06em;
+	letter-spacing: 0.08em;
 	color: var(--low);
 }
 .mid {
@@ -115,12 +119,37 @@ input,
 select,
 textarea {
 	font: inherit;
+	font-size: 14px;
 	color: var(--ink);
 	background: var(--pane);
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	padding: 8px 10px;
+	border: 1px solid var(--line-strong);
+	border-radius: 6px;
+	padding: 0 12px;
+	height: 36px;
 	width: 100%;
+	outline: none;
+}
+textarea {
+	height: auto;
+	padding: 8px 12px;
+}
+input::placeholder,
+textarea::placeholder {
+	color: var(--low);
+}
+input:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--working);
+	box-shadow: 0 0 0 1px var(--working);
+}
+select {
+	appearance: none;
+	background-image: linear-gradient(45deg, transparent 50%, var(--low) 50%), linear-gradient(135deg, var(--low) 50%, transparent 50%);
+	background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+	padding-right: 30px;
 }
 textarea {
 	resize: vertical;
@@ -128,7 +157,9 @@ textarea {
 input[type='checkbox'],
 input[type='radio'] {
 	width: auto;
+	height: auto;
 	accent-color: var(--accent);
+	box-shadow: none;
 }
 :focus-visible {
 	outline: 2px solid var(--focus);

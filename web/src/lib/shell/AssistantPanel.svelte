@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { get, post, message } from '$lib/api';
-	import { session } from '$lib/session.svelte';
+	import { refreshMe, session } from '$lib/session.svelte';
 	import { money } from '$lib/format';
 	import Button from '$lib/ui/Button.svelte';
 	import { toast } from '$lib/ui/toast.svelte';
@@ -14,9 +14,25 @@
 	let text = $state('');
 	let busy = $state(false);
 
+	const on = $derived(!!session.me?.account.ai_enabled);
+	let turning = $state(false);
+
 	$effect(() => {
-		get('/assistant').then((r) => (messages = r.messages));
+		if (on) get('/assistant').then((r) => (messages = r.messages));
 	});
+
+	async function turnOn() {
+		turning = true;
+		try {
+			await post('/me/prefs', { ai_enabled: true });
+			await refreshMe();
+			toast('Assistant on');
+		} catch (err) {
+			toast(message(err), true);
+		} finally {
+			turning = false;
+		}
+	}
 
 	async function ask(e: SubmitEvent) {
 		e.preventDefault();
@@ -55,6 +71,13 @@
 
 <aside class="assistant" aria-label="Assistant">
 	<div class="row"><h2>Assistant</h2><span class="spacer"></span><button class="x" onclick={() => (session.assistantOpen = false)} aria-label="Close">✕</button></div>
+	{#if !on}
+		<div class="off stack">
+			<p>The assistant is off. Turned on, it sets things up for you from a sentence, like "tell me when ACME goes below $90". It fills in the same forms you would, and nothing runs until you apply it.</p>
+			<p class="mid">Its AI is billed at exactly what the provider charges, and stops at your spending cap. Everything in Croncave works without it.</p>
+			<div class="row"><Button variant="primary" busy={turning} onclick={turnOn}>Turn on the assistant</Button><Button onclick={() => (session.assistantOpen = false)}>Not now</Button></div>
+		</div>
+	{:else}
 	<div class="msgs">
 		{#each messages as m, i (i)}
 			<div class="msg {m.role}">
@@ -73,6 +96,7 @@
 		{/each}
 	</div>
 	<form class="row" onsubmit={ask} style="flex-wrap: nowrap"><input bind:value={text} placeholder="Ask the assistant" aria-label="Ask the assistant" /><Button type="submit" variant="primary" {busy}>Ask</Button></form>
+	{/if}
 </aside>
 
 <style>
@@ -108,6 +132,10 @@
 	}
 	.assistant .msg.assistant {
 		border: 1px solid var(--line);
+	}
+	.off {
+		align-content: start;
+		grid-row: 2 / 4;
 	}
 	.small {
 		font-size: 11.5px;

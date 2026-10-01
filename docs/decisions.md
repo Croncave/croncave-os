@@ -3,6 +3,40 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: The web app follows the design canvases screen by screen
+
+**Decision** (the founder's calls, asked before building):
+- **Scope.** Every screen in the design canvases (`docs/design.md`) is rebuilt to match. Where a screen shows
+  something the backend can't do yet (Watcher conditions and quiet hours, run progress with CPU and memory, the
+  Files right-click menu, storage choices, sleep timing per computer), the backend is built too, so nothing on
+  screen is fake. The work lands area by area, each pushed to `main`.
+- **Sizes stay Small, Medium and Large** from the plan catalog. The New computer design's Light, Standard, Power
+  and Heavy cards are drawn with the catalog's names and specs, because every price and limit comes from the
+  catalog.
+- **Apps and settings pages that aren't built are shown as "Coming soon"**: Data and Fetcher sit in the dock,
+  dimmed and not openable, so the layout matches the design and people can see what's coming.
+- **The Ask button shows for everyone, and can be put away.** With AI off it explains the assistant and offers to
+  turn it on; nothing reaches an AI model until someone does. Putting it away is a per-person preference
+  (`prefs.ask_hidden`), undone in Settings › Assistant.
+
+My calls while building the shell:
+- **The design's extra colors become tokens** (scheme version 2): `raised` (tiles), `track` (meter tracks),
+  `line-strong` (field borders), `accent-hover` (link hover), a soft fill per status (`live-soft` … `asleep-soft`)
+  for the status pills, four code-highlighting colors, and `shadow`. Light values come from the canvases' light
+  screens where they exist; the rest are chosen to keep the scheme's contrast checks passing.
+- **The top bar shows usage left, not spend against the cap.** The canvases have both; the Plans and Billing
+  canvas, the newer one, replaced "This month $6.20 / $25" with "Plus · usage left $1.60" and a meter. Usage left
+  matches how the product meters: free usage first, then overage only if turned on.
+- **Statuses are pills by default** (`<Status>`), a word on a soft fill of its color, as in every canvas; dense
+  rows can ask for the plain form.
+- **Icons are the canvases' own stroke icons**, collected into `web/src/lib/ui/icons.ts`, instead of an icon
+  library, so the app draws exactly what the designs draw.
+
+**Alternatives.** Restyle the existing pages without changing their structure: faster, but the designs change
+layouts (framed app windows with a list pane, the sign-up as separate steps), not just colors. Adopt the
+design's four sizes: rejected by the founder in favor of the catalog. Hide unbuilt apps until they exist: the
+founder preferred showing them as coming soon.
+
 ## 2026-10-01: pnpm is pinned per package, and the lockfiles satisfy the release-age policy
 
 **Decision.** `web/package.json` and `e2e/package.json` carry `"packageManager": "pnpm@12.6.0"`, and both

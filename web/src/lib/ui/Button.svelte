@@ -1,24 +1,44 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import Icon from './Icon.svelte';
 	type Props = {
 		variant?: 'primary' | 'ghost' | 'danger' | 'quiet';
-		size?: 'sm' | 'md';
+		size?: 'xs' | 'sm' | 'md' | 'lg';
 		type?: 'button' | 'submit';
+		icon?: string;
+		block?: boolean;
 		disabled?: boolean;
 		busy?: boolean;
 		href?: string;
 		title?: string;
+		label?: string;
 		onclick?: (e: MouseEvent) => void;
-		children: Snippet;
+		children?: Snippet;
 	};
-	let { variant = 'ghost', size = 'md', type = 'button', disabled = false, busy = false, href, title, onclick, children }: Props = $props();
+	let {
+		variant = 'ghost',
+		size = 'md',
+		type = 'button',
+		icon,
+		block = false,
+		disabled = false,
+		busy = false,
+		href,
+		title,
+		label,
+		onclick,
+		children
+	}: Props = $props();
+	const iconSize = $derived(size === 'xs' ? 13 : size === 'sm' ? 14 : 15);
 </script>
 
 {#if href}
-	<a class="btn {variant} {size}" {href} {title}>{@render children()}</a>
+	<a class="btn {variant} {size}" class:block {href} {title} aria-label={label}>
+		{#if icon}<Icon name={icon} size={iconSize} />{/if}{@render children?.()}
+	</a>
 {:else}
-	<button class="btn {variant} {size}" {type} {title} disabled={disabled || busy} {onclick}>
-		{#if busy}<span class="spin" aria-hidden="true"></span>{/if}{@render children()}
+	<button class="btn {variant} {size}" class:block {type} {title} aria-label={label} disabled={disabled || busy} {onclick}>
+		{#if busy}<span class="spin" aria-hidden="true"></span>{:else if icon}<Icon name={icon} size={iconSize} />{/if}{@render children?.()}
 	</button>
 {/if}
 
@@ -26,27 +46,39 @@
 	.btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
-		border-radius: 8px;
+		justify-content: center;
+		gap: 6px;
+		height: 36px;
+		padding: 0 14px;
+		border-radius: 6px;
 		border: 1px solid var(--line);
 		background: var(--surface);
 		color: var(--ink);
-		font: inherit;
-		font-weight: 500;
+		font: 500 14px Inter, system-ui, sans-serif;
 		cursor: pointer;
 		white-space: nowrap;
 		text-decoration: none;
+		flex-shrink: 0;
 	}
 	.btn:hover:not(:disabled) {
-		background: var(--pane);
+		border-color: var(--line-strong);
 		text-decoration: none;
 	}
-	.md {
-		padding: 7px 14px;
+	.lg {
+		height: 40px;
 	}
 	.sm {
-		padding: 3px 10px;
+		height: 30px;
+		padding: 0 10px;
 		font-size: 13px;
+	}
+	.xs {
+		height: 28px;
+		padding: 0 8px;
+		font-size: 12px;
+	}
+	.block {
+		flex-grow: 1;
 	}
 	.primary {
 		background: var(--accent);
@@ -54,16 +86,26 @@
 		color: var(--on-accent);
 	}
 	.primary:hover:not(:disabled) {
-		background: var(--accent);
+		border-color: var(--accent);
 		filter: brightness(1.08);
 	}
 	.danger {
 		color: var(--failed);
+		border-color: var(--failed);
+	}
+	.danger:hover:not(:disabled) {
+		border-color: var(--failed);
+		background: var(--failed-soft);
 	}
 	.quiet {
 		border-color: transparent;
 		background: transparent;
 		color: var(--mid);
+	}
+	.quiet:hover:not(:disabled) {
+		border-color: transparent;
+		color: var(--ink);
+		background: var(--raised);
 	}
 	.btn:disabled {
 		opacity: 0.5;

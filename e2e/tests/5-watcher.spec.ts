@@ -54,11 +54,10 @@ test('a stock price watch draws its history and a missing page is "couldn\'t che
 test('the assistant is off until turned on, then proposes a watch you apply', async ({ page }) => {
 	await signUp(page);
 	await newComputer(page);
-	await expect(page.getByRole('button', { name: 'Ask the assistant' })).toHaveCount(0);
-	await page.goto('/settings');
-	await page.getByTestId('ai-toggle').check();
-	await expect(page.getByRole('button', { name: 'Ask the assistant' })).toBeVisible();
+	// Ask is always there; with AI off it only explains and offers to turn it on.
 	await page.getByRole('button', { name: 'Ask the assistant' }).click();
+	await expect(page.getByRole('textbox', { name: 'Ask the assistant' })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Turn on the assistant' }).click();
 	await page.getByRole('textbox', { name: 'Ask the assistant' }).fill('tell me when ACME stock goes below $90');
 	await page.getByRole('button', { name: 'Ask', exact: true }).click();
 	await expect(page.getByText('Watch ACME below $90')).toBeVisible();
@@ -66,4 +65,15 @@ test('the assistant is off until turned on, then proposes a watch you apply', as
 	await expect(page).toHaveURL(/\/watcher\//);
 	await page.goto('/settings');
 	await expect(page.getByText('assistant').first()).toBeVisible();
+});
+
+test('the Ask button can be put away, and stays away', async ({ page }) => {
+	await signUp(page);
+	await newComputer(page);
+	await page.getByRole('button', { name: 'Ask the assistant' }).hover();
+	await page.getByRole('button', { name: 'Hide the Ask button' }).click();
+	await expect(page.getByRole('button', { name: 'Ask the assistant' })).toHaveCount(0);
+	await page.reload();
+	await expect(page.getByTestId('computer-switcher')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Ask the assistant' })).toHaveCount(0);
 });

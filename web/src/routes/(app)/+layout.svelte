@@ -6,6 +6,7 @@
 	import Dock from '$lib/shell/Dock.svelte';
 	import ActivityPanel from '$lib/shell/ActivityPanel.svelte';
 	import AssistantPanel from '$lib/shell/AssistantPanel.svelte';
+	import AskButton from '$lib/shell/AskButton.svelte';
 	import { refreshMe, session } from '$lib/session.svelte';
 	import { connectLive, onChange, throttle } from '$lib/live';
 
@@ -48,25 +49,27 @@
 			</main>
 		</div>
 		{#if session.activityOpen}<ActivityPanel />{/if}
-		{#if session.assistantOpen && session.me.account.ai_enabled}<AssistantPanel />{/if}
+		{#if session.assistantOpen}<AssistantPanel />{/if}
+		<AskButton />
 	</div>
 {/if}
 
 <style>
 	.shell {
 		min-height: 100vh;
-		display: grid;
-		grid-template-rows: auto 1fr;
+		background: var(--bg);
 	}
 	.body {
-		display: grid;
-		grid-template-columns: auto 1fr;
+		display: flex;
 		min-height: calc(100vh - 52px);
 	}
 	.main {
+		flex: 1;
 		min-width: 0;
+		display: flex;
+		flex-direction: column;
 	}
 	.paused {
-		margin: 16px 28px 0;
+		margin: 0 12px 12px 0;
 	}
 </style>

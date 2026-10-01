@@ -76,6 +76,8 @@ pub struct PrefsBody {
     pub channels: Option<Value>,
     pub quiet_hours: Option<Value>,
     pub ai_enabled: Option<bool>,
+    /// Hide the floating Ask button (it can be shown again from Settings › Assistant).
+    pub ask_hidden: Option<bool>,
 }
 
 pub async fn update_prefs(State(app): State<AppState>, auth: Auth, Json(b): Json<PrefsBody>) -> ApiResult<Json<Value>> {
@@ -95,6 +97,9 @@ pub async fn update_prefs(State(app): State<AppState>, auth: Auth, Json(b): Json
     }
     if let Some(q) = b.quiet_hours {
         prefs["quiet_hours"] = q;
+    }
+    if let Some(h) = b.ask_hidden {
+        prefs["ask_hidden"] = json!(h);
     }
     let name = b.name.map(|n| n.trim().chars().take(60).collect::<String>()).unwrap_or(auth.user.name.clone());
     sqlx::query("update users set prefs = $2, name = $3 where id = $1")
