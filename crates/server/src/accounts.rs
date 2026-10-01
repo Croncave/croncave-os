@@ -89,6 +89,8 @@ pub struct PrefsBody {
     pub ai_enabled: Option<bool>,
     /// Hide the floating Ask button (it can be shown again from Settings › Assistant).
     pub ask_hidden: Option<bool>,
+    /// Folders pinned in Files, per computer: `{ "<computer id>": ["jobs", "thesis"] }`.
+    pub pins: Option<Value>,
 }
 
 pub async fn update_prefs(State(app): State<AppState>, auth: Auth, Json(b): Json<PrefsBody>) -> ApiResult<Json<Value>> {
@@ -111,6 +113,15 @@ pub async fn update_prefs(State(app): State<AppState>, auth: Auth, Json(b): Json
     }
     if let Some(h) = b.ask_hidden {
         prefs["ask_hidden"] = json!(h);
+    }
+    if let Some(p) = b.pins {
+        let ok = p.as_object().is_some_and(|m| {
+            m.values().all(|v| v.as_array().is_some_and(|a| a.len() <= 20 && a.iter().all(Value::is_string)))
+        });
+        if !ok {
+            return Err(ApiError::bad("Pins are a list of folders per computer."));
+        }
+        prefs["pins"] = p;
     }
     let name = b.name.map(|n| n.trim().chars().take(60).collect::<String>()).unwrap_or(auth.user.name.clone());
     sqlx::query("update users set prefs = $2, name = $3 where id = $1")

@@ -68,23 +68,16 @@ pub struct PathQuery {
     pub path: String,
 }
 
-pub async fn list(
-    State(app): State<AppState>,
-    auth: Auth,
-    Path(id): Path<Uuid>,
-    Query(q): Query<PathQuery>,
-) -> ApiResult<Json<Value>> {
-    let c = ready(&app, &auth, id).await?;
-    let entries: Vec<FileEntry> = ask(&app, &c, FilesRequest::List { path: q.path.clone() }, None).await?;
+/// Each entry with where it came from: the latest record for its path.
+async fn with_sources(app: &AppState, computer: Uuid, entries: Vec<FileEntry>) -> ApiResult<Vec<Value>> {
     let paths: Vec<String> = entries.iter().map(|e| e.path.clone()).collect();
-    // Where each file came from: the latest record for its path.
     let sources: Vec<(String, String, String, Option<Uuid>, Option<String>, chrono::DateTime<chrono::Utc>)> =
         sqlx::query_as(
             "select distinct on (f.path) f.path, f.change, f.actor_kind, f.run_id, j.name, f.at
          from file_records f left join runs r on r.id = f.run_id left join jobs j on j.id = r.job_id
          where f.computer_id = $1 and f.path = any($2) order by f.path, f.id desc",
         )
-        .bind(c.id)
+        .bind(computer)
         .bind(&paths)
         .fetch_all(&app.db)
         .await?;
@@ -111,6 +104,18 @@ pub async fn list(
             v
         })
         .collect();
+    Ok(items)
+}
+
+pub async fn list(
+    State(app): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    Query(q): Query<PathQuery>,
+) -> ApiResult<Json<Value>> {
+    let c = ready(&app, &auth, id).await?;
+    let entries: Vec<FileEntry> = ask(&app, &c, FilesRequest::List { path: q.path.clone() }, None).await?;
+    let items = with_sources(&app, c.id, entries).await?;
     Ok(Json(json!({ "path": q.path, "entries": items })))
 }
 
@@ -244,9 +249,95 @@ pub async fn trash(State(app): State<AppState>, auth: Auth, Path(id): Path<Uuid>
             v["deleted_by_label"] =
                 json!(if t.deleted_by == "assistant" { "Deleted by the assistant" } else { "Deleted by you" });
         }
+        // Trash keeps things this long (the agent's CRONCAVE_TRASH_DAYS), then lets go.
+        let age_days = (app.real_now().timestamp_millis() - t.deleted_ms).max(0) / 86_400_000;
+        v["days_left"] = json!((TRASH_DAYS - age_days).max(0));
         out.push(v);
     }
-    Ok(Json(json!({ "items": out })))
+    Ok(Json(json!({ "items": out, "keep_days": TRASH_DAYS })))
+}
+
+/// How long Trash keeps things before they're gone for good.
+pub const TRASH_DAYS: i64 = 30;
+
+#[derive(Deserialize)]
+pub struct LimitQuery {
+    pub limit: Option<usize>,
+}
+
+/// The most recently changed files on the computer, with where each came from.
+pub async fn recent(
+    State(app): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    Query(q): Query<LimitQuery>,
+) -> ApiResult<Json<Value>> {
+    let c = ready(&app, &auth, id).await?;
+    let entries: Vec<FileEntry> = ask(&app, &c, FilesRequest::Recent { limit: q.limit.unwrap_or(50) }, None).await?;
+    let items = with_sources(&app, c.id, entries).await?;
+    Ok(Json(json!({ "entries": items })))
+}
+
+#[derive(Deserialize)]
+pub struct CopyBody {
+    pub path: String,
+    pub to_computer: Uuid,
+    /// Where on the other computer; the same path when left out.
+    pub to_path: Option<String>,
+}
+
+/// Copy a file or folder to another of your computers. It travels through the control
+/// plane in chunks (folders as a zip that the other computer unpacks); whatever was at
+/// the destination goes to that computer's Trash, never overwritten.
+pub async fn copy_to(
+    State(app): State<AppState>,
+    auth: Auth,
+    Path(id): Path<Uuid>,
+    Json(b): Json<CopyBody>,
+) -> ApiResult<Json<Value>> {
+    if b.to_computer == id {
+        return Err(ApiError::bad("Choose another computer to copy to."));
+    }
+    let src = ready(&app, &auth, id).await?;
+    let dst = ready(&app, &auth, b.to_computer).await?;
+    let (head, mut s): (Value, _) =
+        app.relay.request(src.id, &StreamOpen::Files(FilesRequest::Download { path: b.path.clone() }), None).await?;
+    let size = head["size"].as_u64().unwrap_or(0);
+    if size > dst.disk_gb as u64 * 1_000_000_000 {
+        return Err(ApiError::bad(format!("That's bigger than {}'s storage. Add storage in its settings.", dst.name)));
+    }
+    let zipped = head["zip"].as_bool() == Some(true);
+    let upload_id = Uuid::new_v4().simple().to_string();
+    let mut offset = 0u64;
+    let mut buf: Vec<u8> = Vec::with_capacity(1 << 20);
+    loop {
+        let chunk = s.recv().await;
+        let done = chunk.is_none();
+        if let Some(c) = chunk {
+            buf.extend_from_slice(&c.map_err(|e| ApiError::unavailable(format!("The copy was interrupted: {e}")))?);
+        }
+        if buf.len() >= 1 << 20 || (done && !buf.is_empty()) {
+            let r: Value = ask(
+                &app,
+                &dst,
+                FilesRequest::UploadChunk { upload_id: upload_id.clone(), offset },
+                Some(Bytes::from(std::mem::take(&mut buf))),
+            )
+            .await?;
+            if r["mismatch"].as_bool() == Some(true) {
+                return Err(ApiError::unavailable("The copy was interrupted. Try again."));
+            }
+            offset = r["received"].as_u64().unwrap_or(offset);
+        }
+        if done {
+            break;
+        }
+    }
+    let to = b.to_path.clone().unwrap_or_else(|| b.path.clone());
+    let e: Value =
+        ask(&app, &dst, FilesRequest::UploadFinish { upload_id, path: to.clone(), extract: zipped }, None).await?;
+    record_user_change(&app, &auth, dst.id, &[e["path"].as_str().unwrap_or(&to).to_string()], "created").await?;
+    Ok(Json(json!({ "entry": e, "computer": dst.name })))
 }
 
 #[derive(Deserialize)]
@@ -332,7 +423,9 @@ pub async fn finish_upload(
     Json(b): Json<PathBody>,
 ) -> ApiResult<Json<Value>> {
     let c = ready(&app, &auth, id).await?;
-    let e: Value = ask(&app, &c, FilesRequest::UploadFinish { upload_id: upload, path: b.path.clone() }, None).await?;
+    let e: Value =
+        ask(&app, &c, FilesRequest::UploadFinish { upload_id: upload, path: b.path.clone(), extract: false }, None)
+            .await?;
     let path = e["path"].as_str().unwrap_or(&b.path).to_string();
     record_user_change(
         &app,

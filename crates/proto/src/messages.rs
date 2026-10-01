@@ -335,6 +335,13 @@ pub enum FilesRequest {
     UploadFinish {
         upload_id: String,
         path: String,
+        /// The upload is a zip of a folder: unpack it into `path`.
+        #[serde(default)]
+        extract: bool,
+    },
+    /// The most recently changed files anywhere in the root.
+    Recent {
+        limit: usize,
     },
     /// Write a whole small file (the Code editor's save).
     Write {
@@ -350,6 +357,9 @@ pub struct FileEntry {
     pub is_dir: bool,
     pub size: u64,
     pub modified_ms: i64,
+    /// How many things a folder holds (directly).
+    #[serde(default)]
+    pub items: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

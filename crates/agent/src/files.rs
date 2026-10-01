@@ -37,13 +37,23 @@ pub async fn handle(agent: &Agent, req: FilesRequest, s: &mut AgentStream) {
                 }
             }
             FilesRequest::Download { path } => {
-                let file = disk.resolve(&path)?;
-                let meta = std::fs::metadata(&file).map_err(|_| format!("\"{path}\" wasn't found"))?;
-                if meta.is_dir() {
-                    return Err("Download a folder's files one by one for now; zipped folders come later.".into());
-                }
-                s.send_json(&json!({ "size": meta.len(), "name": file.file_name().map(|n| n.to_string_lossy()) }))
-                    .await;
+                let target = disk.resolve(&path)?;
+                let meta = std::fs::metadata(&target).map_err(|_| format!("\"{path}\" wasn't found"))?;
+                let base = target
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "My computer".into());
+                // A folder downloads as a zip, made in the system area and removed after.
+                let (file, name, zipped) = if meta.is_dir() {
+                    let tmp = disk.system("tmp").join(format!("{}.zip", uuid::Uuid::new_v4().simple()));
+                    let (src, dst) = (target.clone(), tmp.clone());
+                    tokio::task::spawn_blocking(move || zip_dir(&src, &dst)).await.map_err(|e| e.to_string())??;
+                    (tmp, format!("{base}.zip"), true)
+                } else {
+                    (target.clone(), base, false)
+                };
+                let size = std::fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+                s.send_json(&json!({ "size": size, "name": name, "zip": zipped })).await;
                 let mut f = tokio::fs::File::open(&file).await.map_err(|e| e.to_string())?;
                 let mut buf = vec![0u8; 256 * 1024];
                 loop {
@@ -52,6 +62,17 @@ pub async fn handle(agent: &Agent, req: FilesRequest, s: &mut AgentStream) {
                         break;
                     }
                 }
+                if zipped {
+                    let _ = std::fs::remove_file(&file);
+                }
+            }
+            FilesRequest::Recent { limit } => {
+                let root = disk.root();
+                let found = tokio::task::spawn_blocking(move || recent(&root, limit.min(200)))
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let entries: Vec<FileEntry> = found.iter().filter_map(|p| entry(disk, p).ok()).collect();
+                s.send_json(&entries).await;
             }
             FilesRequest::Mkdir { path } => {
                 let dir = disk.resolve(&path)?;
@@ -118,12 +139,24 @@ pub async fn handle(agent: &Agent, req: FilesRequest, s: &mut AgentStream) {
                 let have = std::fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
                 s.send_json(&json!({ "received": have })).await;
             }
-            FilesRequest::UploadFinish { upload_id, path } => {
+            FilesRequest::UploadFinish { upload_id, path, extract } => {
                 let part = upload_part(disk, &upload_id)?;
                 if !part.exists() {
                     std::fs::File::create(&part).map_err(|e| e.to_string())?;
                 }
                 let dst = disk.resolve(&path)?;
+                if extract {
+                    // A folder copied from another computer: unpack it in place of `path`.
+                    let replaced = if dst.exists() { Some(to_trash(disk, &dst, "user")?) } else { None };
+                    std::fs::create_dir_all(&dst).map_err(|e| e.to_string())?;
+                    let (zip, into) = (part.clone(), dst.clone());
+                    tokio::task::spawn_blocking(move || unzip(&zip, &into)).await.map_err(|e| e.to_string())??;
+                    let _ = std::fs::remove_file(&part);
+                    let mut e = serde_json::to_value(entry(disk, &dst)?).expect("entry serializes");
+                    e["replaced"] = json!(replaced.is_some());
+                    s.send_json(&e).await;
+                    return Ok(());
+                }
                 let replaced = if dst.exists() { Some(to_trash(disk, &dst, "user")?) } else { None };
                 if let Some(p) = dst.parent() {
                     std::fs::create_dir_all(p).map_err(|e| e.to_string())?;
@@ -168,7 +201,9 @@ fn upload_part(disk: &Disk, id: &str) -> Result<PathBuf, String> {
 
 pub fn entry(disk: &Disk, path: &Path) -> Result<FileEntry, String> {
     let meta = std::fs::metadata(path).map_err(|_| format!("\"{}\" wasn't found", rel_string(&disk.root(), path)))?;
+    let items = if meta.is_dir() { std::fs::read_dir(path).ok().map(|rd| rd.count() as u64) } else { None };
     Ok(FileEntry {
+        items,
         name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         path: rel_string(&disk.root(), path),
         is_dir: meta.is_dir(),
@@ -180,6 +215,70 @@ pub fn entry(disk: &Disk, path: &Path) -> Result<FileEntry, String> {
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0),
     })
+}
+
+/// Zip a folder (its contents, relative to it).
+fn zip_dir(src: &Path, dst: &Path) -> Result<(), String> {
+    use zip::write::SimpleFileOptions;
+    let file = std::fs::File::create(dst).map_err(|e| e.to_string())?;
+    let mut z = zip::ZipWriter::new(file);
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let mut stack = vec![src.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for e in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+            let p = e.path();
+            let rel = rel_string(src, &p);
+            let ft = e.file_type().map_err(|e| e.to_string())?;
+            if ft.is_dir() {
+                z.add_directory(format!("{rel}/"), opts).map_err(|e| e.to_string())?;
+                stack.push(p);
+            } else if ft.is_file() {
+                z.start_file(rel, opts).map_err(|e| e.to_string())?;
+                let mut f = std::fs::File::open(&p).map_err(|e| e.to_string())?;
+                std::io::copy(&mut f, &mut z).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    z.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Unpack a zip into a folder; entries that would land outside it are refused by the zip
+/// reader.
+fn unzip(zip_path: &Path, into: &Path) -> Result<(), String> {
+    let f = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(f).map_err(|_| "That isn't a zip file.".to_string())?;
+    archive.extract(into).map_err(|e| e.to_string())
+}
+
+/// The `limit` most recently changed files under `root`, newest first. Stops looking after
+/// a generous number of entries so a huge disk can't stall the agent.
+fn recent(root: &Path, limit: usize) -> Vec<PathBuf> {
+    let mut found: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    let mut seen = 0usize;
+    while let Some(dir) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        for e in rd.flatten() {
+            seen += 1;
+            if seen > 50_000 {
+                break;
+            }
+            let Ok(ft) = e.file_type() else { continue };
+            if ft.is_dir() {
+                if !e.file_name().to_string_lossy().starts_with('.') {
+                    stack.push(e.path());
+                }
+            } else if ft.is_file()
+                && let Ok(m) = e.metadata()
+                && let Ok(t) = m.modified()
+            {
+                found.push((t, e.path()));
+            }
+        }
+    }
+    found.sort_by_key(|f| std::cmp::Reverse(f.0));
+    found.into_iter().take(limit).map(|(_, p)| p).collect()
 }
 
 fn list(disk: &Disk, dir: &Path) -> Result<Vec<FileEntry>, String> {
@@ -385,6 +484,36 @@ mod tests {
         assert_eq!(columns, vec!["id", "name"]);
         assert_eq!(rows.len(), MAX_PREVIEW_ROWS);
         assert_eq!(total_rows, 500);
+    }
+
+    #[test]
+    fn folders_zip_and_unzip_to_the_same_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("jobs");
+        std::fs::create_dir_all(src.join("logs")).unwrap();
+        std::fs::write(src.join("a.csv"), "x,y\n1,2\n").unwrap();
+        std::fs::write(src.join("logs/run.txt"), "ok").unwrap();
+        let zip = dir.path().join("jobs.zip");
+        zip_dir(&src, &zip).unwrap();
+        let out = dir.path().join("copy");
+        std::fs::create_dir_all(&out).unwrap();
+        unzip(&zip, &out).unwrap();
+        assert_eq!(std::fs::read_to_string(out.join("a.csv")).unwrap(), "x,y\n1,2\n");
+        assert_eq!(std::fs::read_to_string(out.join("logs/run.txt")).unwrap(), "ok");
+    }
+
+    #[test]
+    fn recent_lists_newest_files_first_and_counts_folder_items() {
+        let dir = tempfile::tempdir().unwrap();
+        let disk = Disk::open(dir.path()).unwrap();
+        std::fs::create_dir_all(disk.root().join("a/b")).unwrap();
+        std::fs::write(disk.root().join("a/old.txt"), "1").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(disk.root().join("a/b/new.txt"), "2").unwrap();
+        let r = recent(&disk.root(), 10);
+        assert_eq!(r[0].file_name().unwrap(), "new.txt");
+        assert_eq!(r.len(), 2);
+        assert_eq!(entry(&disk, &disk.root().join("a")).unwrap().items, Some(2));
     }
 
     #[test]

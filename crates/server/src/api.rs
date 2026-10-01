@@ -64,6 +64,8 @@ pub fn router(app: AppState) -> Router {
         .route("/computers/{id}/files/restore", post(files_api::restore))
         .route("/computers/{id}/files/empty-trash", post(files_api::empty_trash))
         .route("/computers/{id}/files/usage", get(files_api::usage))
+        .route("/computers/{id}/files/recent", get(files_api::recent))
+        .route("/computers/{id}/files/copy", post(files_api::copy_to))
         .route("/computers/{id}/uploads", post(files_api::start_upload))
         .route("/computers/{id}/uploads/{upload}", get(files_api::upload_status).put(files_api::upload_chunk))
         .route("/computers/{id}/uploads/{upload}/finish", post(files_api::finish_upload))
