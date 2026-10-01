@@ -1,0 +1,15 @@
+{
+  "default": "croncave",
+  "order": [
+    "croncave",
+    "ember",
+    "harbor",
+    "fern",
+    "plum",
+    "rose",
+    "lagoon",
+    "saffron",
+    "graphite",
+    "contrast"
+  ]
+}

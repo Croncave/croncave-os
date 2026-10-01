@@ -3,6 +3,24 @@
 Every decision with lasting impact, newest first. Each entry says what was decided, why, and what else was
 considered. When experience contradicts a decision, add a dated amendment instead of rewriting history.
 
+## 2026-10-01: Ten color schemes ship as catalog data
+
+**Decision.** Croncave offers ten color schemes (Croncave, Ember, Harbor, Fern, Plum, Rose, Lagoon, Saffron,
+Graphite, High contrast), each with light and dark values for every token. They live in
+`crates/server/catalog/scheme-<id>.json`, listed in order by `schemes.json`, and people pick one in Settings ›
+Appearance. Croncave stays the default. The build is described in `docs/color-schemes.md`.
+
+**Why.** The founder asked for a choice of schemes, and the token system was built for this: components only use
+`var(--token)`, so a scheme is new data, not new code. As files, every scheme goes through the same
+`schemeProblems()` check, so none can ship with unreadable text or statuses that look alike. Each was designed on
+the canvas first (a picker there recolors every screen), so the values were seen on real screens before they were
+written down.
+
+**Alternatives.** Generate schemes at runtime from one accent color (less control; results are hard to check
+before people see them). Let people pick any accent color (a later step; most picks would fail the contrast checks
+without help). Keep schemes as CSS files in the web app (schemes are platform data the control plane serves and
+versions, like the plan catalog).
+
 ## 2026-10-01: Scripts can keep to part of the day, wait for files to settle, and report progress
 
 **Decision.** The Scripts design's controls each have a backend:
